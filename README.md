@@ -26,14 +26,14 @@ Dane osobowe z przykładów są zamaskowane (A/a – litera, 9 – cyfra); kody,
 
 ## Zapisywanie
 
-Decyzje zapisują się automatycznie w przeglądarce. Menu „…” → **Zapisz ustalenia do pliku** tworzy plik JSON; druga osoba wczytuje go przez **Wczytaj ustalenia z pliku** (nowsze wpisy zastępują starsze). Przełącznik **PL | EN** zmienia język interfejsu i raportu (także `?lang=en` w linku).
+Przy pierwszym wejściu narzędzie prosi o imię i zespół (Xpertis, Workday, Saint-Gobain); zapisujemy je przy każdej decyzji i w raporcie, a zmienić można je przyciskiem z imieniem w nagłówku. Decyzje zapisują się automatycznie w przeglądarce. Menu „…” → **Zapisz ustalenia do pliku** tworzy plik JSON; druga osoba wczytuje go przez **Wczytaj ustalenia z pliku** (nowsze wpisy zastępują starsze). Przełącznik **PL | EN** zmienia język interfejsu i raportu (także `?lang=en` w linku).
 
 ---
 
 <a id="english"></a>
 ## English
 
-A simple tool for the Xpertis team to go process by process (the 32 processes of `PECI_XML_Sections_fields.xlsm`) through the data Workday sends in the PECI file in the Polish configuration. Each process shows the **PL standard** (data in the PL sample file) and **optional data** (fields `PECI_XML_Sections_fields.xlsm` lists for the process that are not in the standard). Three steps: data completeness (standard and optional data, including whether to add optional data to PL PECI), conversion to the Xpertis format for everything that will reach Xpertis, and confirmation with sign-off. The **Excel report** collects all decisions. Decisions are saved in the browser and can be exchanged as a JSON file. Personal values from the samples are masked.
+A simple tool for the Xpertis team to go process by process (the 32 processes of `PECI_XML_Sections_fields.xlsm`) through the data Workday sends in the PECI file in the Polish configuration. Each process shows the **PL standard** (data in the PL sample file) and **optional data** (fields `PECI_XML_Sections_fields.xlsm` lists for the process that are not in the standard). Three steps: data completeness (standard and optional data, including whether to add optional data to PL PECI), conversion to the Xpertis format for everything that will reach Xpertis, and confirmation with sign-off. The **Excel report** collects all decisions. On first use the tool asks for your name and team (Xpertis, Workday, Saint-Gobain), saved with every decision and in the report. Decisions are saved in the browser and can be exchanged as a JSON file. Personal values from the samples are masked.
 
 ## Biblioteki · Libraries
 
