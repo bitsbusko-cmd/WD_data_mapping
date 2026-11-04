@@ -20,7 +20,7 @@ Na koniec **Raport Excel** zbiera wszystkie decyzje w czterech arkuszach: Podsum
 
 ## Źródła
 
-- 31 plików PECI z folderu „Sample PECI Files -Poland”: 30 przypisanych do 21 procesów po kodzie zdarzenia i treści zmian (część plików zawiera kilka zmian – Sequence – rozdzielonych między procesy); `Education_Addition.xml` nie pasuje do żadnego procesu z listy.
+- 30 plików PECI z folderu „Sample PECI Files -Poland”, przypisanych do 21 procesów po kodzie zdarzenia i treści zmian (część plików zawiera kilka zmian – Sequence – rozdzielonych między procesy). `Education_Addition.xml` pominięto – wykształcenie jest poza zakresem (decyzja zespołu Workday).
 - `PECI_XML_Sections_fields.xlsm`: lista 32 procesów z kodami zdarzeń, przykłady danych dla procesów (arkusze 1–32) i słownik pól PECI.
 
 Dane osobowe z przykładów są zamaskowane (A/a – litera, 9 – cyfra); kody, daty i identyfikatory organizacyjne pokazano bez zmian.
@@ -38,4 +38,4 @@ A simple tool for the Xpertis team to go process by process (the 32 processes of
 
 ## Biblioteki · Libraries
 
-[ExcelJS](https://github.com/exceljs/exceljs) 4.4.0 (`vendor/exceljs.min.js`, MIT) · krój / typeface Atkinson Hyperlegible Next & Mono (`fonts/`, SIL OFL 1.1).
+[ExcelJS](https://github.com/exceljs/exceljs) 4.4.0 (`vendor/exceljs.min.js`, MIT) · ikony procesów / process icons [Phosphor Icons](https://phosphoricons.com) 2.1.1 duotone (MIT, `vendor/LICENSE-phosphor-icons.txt`) · krój / typeface Atkinson Hyperlegible Next & Mono (`fonts/`, SIL OFL 1.1).
