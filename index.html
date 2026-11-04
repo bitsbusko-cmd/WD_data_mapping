@@ -344,7 +344,7 @@ table.fx tr.c td.p{color:var(--tr);font-weight:600}
 (() => {
 'use strict';
 const D = JSON.parse(document.getElementById('data').textContent);
-const VER = '04.11 14:15';
+const VER = '04.11 14:25';
 const EN = JSON.parse(document.getElementById('en').textContent);
 const LS = 'wdx:v1', LSL = 'wdx:lang';
 const $ = (s, r = document) => r.querySelector(s);
@@ -461,7 +461,7 @@ function renderTop() {
     <div class="tools">
       ${known() ? `<button type="button" class="btn ghost user" data-act="who" title="${esc(T('Zmień imię lub zespół'))}">${ic('user')}<span class="t">${esc(S.name)} <small>${esc(S.team)}</small></span></button>` : ''}
       <div class="seg" role="group" aria-label="Język / Language"><button type="button" data-act="lang" data-v="pl" aria-pressed="${LANG === 'pl'}">PL</button><button type="button" data-act="lang" data-v="en" aria-pressed="${LANG === 'en'}">EN</button></div>
-      <button type="button" class="btn pri" data-act="xlsx" title="${esc(T('Raport Excel po angielsku – jeden arkusz ze wszystkimi ustaleniami analizy'))}">${ic('sheet')}<span class="t">PECI data analysis report</span></button>
+      <button type="button" class="btn pri" data-act="xlsx">${ic('sheet')}<span class="t">${esc(T('Raport Excel'))}</span></button>
       <div class="menu"><button type="button" class="btn icon" data-act="menu" aria-expanded="${V.menu}" aria-label="${esc(T('Ustalenia'))}" title="${esc(T('Ustalenia'))}">${ic('dots')}</button>
         <div class="pop" ${V.menu ? '' : 'hidden'}>
           <button type="button" data-act="save">${ic('save')}<span>${esc(T('Zapisz ustalenia do pliku'))}<small>${esc(T('Plik JSON do przekazania innym osobom'))}</small></span></button>
