@@ -1,0 +1,21 @@
+Workday → Xpertis – wersja wieloosobowa (wspólna baza decyzji)
+================================================================
+
+Wymagania: hosting z PHP 7.4 lub nowszym (np. cyber_START! w cyber_Folks).
+Baza danych MySQL nie jest potrzebna – decyzje są w pliku data/state.json.
+
+1. W pliku config.php wpisz hasło zespołu (co najmniej 10 znaków) zamiast ZMIEN-TO-HASLO.
+2. Wgraj całą zawartość tego folderu (razem z ukrytym plikiem .htaccess i folderem data)
+   do katalogu strony, np. public_html albo public_html/peci – przez Menedżer plików w panelu
+   albo FTP.
+3. Włącz certyfikat SSL dla domeny (https), żeby hasło nie szło otwartym tekstem.
+4. Otwórz adres strony. Każda osoba przy pierwszym wejściu podaje imię, zespół i hasło zespołu.
+
+Sprawdzenie:
+- https://twoja-domena/…/api.php?ping  → {"app":"wd-xpertis","v":1,"configured":true}
+- https://twoja-domena/…/data/state.json → błąd 403 (plik niedostępny z zewnątrz)
+
+Kopia zapasowa: plik data/state.json (hosting robi kopię codziennie) oraz menu „…” → Zapisz ustalenia do pliku.
+Zmiana hasła: zmień je w config.php i przekaż zespołowi – aplikacja poprosi o nowe hasło.
+Przeniesienie decyzji z wersji na GitHub Pages: tam menu „…” → Zapisz ustalenia do pliku,
+tutaj menu „…” → Wczytaj ustalenia z pliku – decyzje trafią do wspólnej bazy.
