@@ -344,7 +344,7 @@ table.fx tr.c td.p{color:var(--tr);font-weight:600}
 (() => {
 'use strict';
 const D = JSON.parse(document.getElementById('data').textContent);
-const VER = '04.11 14:10';
+const VER = '04.11 14:15';
 const EN = JSON.parse(document.getElementById('en').textContent);
 const LS = 'wdx:v1', LSL = 'wdx:lang';
 const $ = (s, r = document) => r.querySelector(s);
@@ -864,8 +864,7 @@ function workdayRows() {
       const c = d.c || {}, any = Object.keys(d.f || {}).some(k => d.f[k].n) || Object.keys(d.a || {}).some(k => d.a[k].n) || c.ok || c.miss || c.notes || c.done;
       if (!any) return;
       const base = {pid: p.id, proc: pName(p), ev: p.ev || '', file: files(p)};
-      const st = stats(p);
-      const cm = [c.miss ? 'Missing data: ' + c.miss : '', c.notes ? 'Notes: ' + c.notes : '', `Xpertis decisions – PL standard: ${p.std ? `${st.Y} needed, ${st.N} not needed, ${st.Q} to clarify, ${st.und} not reviewed` : 'none (no PL sample file)'}; optional: ${st.addY} to add, ${st.addN} not to add, ${st.addQ} to clarify; ${st.trY + st.addTrY} conversion(s).`].filter(Boolean).join('\n');
+      const cm = [c.miss ? 'Missing data: ' + c.miss : '', c.notes ? 'Notes: ' + c.notes : ''].filter(Boolean).join('\n');
       out.push(Object.assign({}, base, {kind: 'Process review', sec: '', path: '', fld: '', desc: '', sc: '', type: '', ex: '',
         need: c.ok === 'Y' ? 'Data set complete: Yes' : c.ok === 'N' ? 'Data set complete: No' : 'Data set complete: not confirmed', act: c.miss || c.ok === 'N' ? 'Review missing data' : 'None',
         conv: '', fmt: '', det: '', note: cm, by: c.done ? (c.by || '') : (c.by || ''), dt: c.done ? 'Signed off ' + dt(c.done) : dt(c.ts), f: c.ok === 'N' ? 'Q' : c.ok === 'Y' ? 'Y' : '', proc_row: true}));
@@ -885,40 +884,63 @@ function workdayRows() {
 async function exportWorkday() {
   let X; try { X = await loadExcelJS(); } catch (e) { toast(T('Nie udało się wczytać modułu Excel. Sprawdź połączenie i spróbuj ponownie.')); return; }
   const rows = workdayRows(), items = rows.filter(r => !r.proc_row);
-  const cnt = (k, v) => items.filter(r => r.kind.startsWith(k) && r.f === v).length;
-  const procs = rows.filter(r => r.proc_row);
-  const FILL = {Y: 'FFE1F2E8', A: 'FFECE8F9', N: 'FFE9EDF1', Q: 'FFFAEED7', T: 'FFDEF1F5', P: 'FFEEF1F4'};
-  const cols = [['#', 5], ['Process no.', 8], ['Business process', 28], ['Event code(s)', 11], ['PL sample file', 24], ['Data origin', 24], ['PECI section', 19], ['XML path', 42], ['PECI field', 26], ['Workday description (PECI Dictionary)', 44],
-    ['Chorus scope', 11], ['PECI data type', 14], ['Example value (masked)', 20], ['Required in PECI file (Xpertis)', 20], ['Action for Workday', 22], ['Conversion to Xpertis standard', 15], ['Xpertis target format', 24], ['Conversion details', 28],
-    ['Xpertis comment / question', 42], ['By', 16], ['Date', 12], ['Response / resolution', 38]];
+  // kolumny w grupach: kto/proces → dana PECI → decyzja Xpertis → standard Xpertis → komentarze → dane referencyjne
+  const G = [['Process', 'FF17232E', [['#', 5], ['No.', 6], ['Business process', 26]]],
+    ['PECI data item', 'FF3A4855', [['Data origin', 17], ['PECI section', 18], ['PECI field', 32], ['XML path', 48]]],
+    ['Xpertis decision', 'FF1B7446', [['Required in PECI file', 20], ['Action for Workday', 24]]],
+    ['Xpertis standard', 'FF0A6A80', [['Conversion', 15], ['Target format', 24], ['Conversion details', 32]]],
+    ['Comments', 'FF1E5DAA', [['Comment / question', 40], ['By', 16], ['Date', 12], ['Response / resolution', 36]]],
+    ['Reference (PECI Dictionary, PL sample file)', 'FF66727F', [['Workday description', 44], ['PECI data type', 14], ['Example value (masked)', 27], ['Chorus scope', 11], ['Event code(s)', 10], ['PL sample file', 26]]]];
+  const cols = [].concat(...G.map(g => g[2])), NC = cols.length;
+  const C = {}; let k = 1; G.forEach(g => g[2].forEach(c => { C[c[0]] = k++; }));
+  const FILL = {Y: 'FFE1F2E8', A: 'FFECE8F9', N: 'FFEEF1F4', Q: 'FFFAEED7', T: 'FFDEF1F5'};
   const wb = new X.Workbook(); wb.creator = S.who || 'Workday → Xpertis'; wb.created = new Date();
-  const ws = wb.addWorksheet('PECI data analysis', {views: [{state: 'frozen', ySplit: 7, xSplit: 3}], pageSetup: {orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9}});
+  const HR = 5;
+  const ws = wb.addWorksheet('PECI data analysis', {views: [{state: 'frozen', ySplit: HR, xSplit: 3, showGridLines: false, zoomScale: 90}],
+    pageSetup: {orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9, printTitlesRow: '4:5', margins: {left: .4, right: .4, top: .5, bottom: .5, header: .3, footer: .3}},
+    headerFooter: {oddFooter: '&LPECI data analysis report&RPage &P of &N'}});
   ws.columns = cols.map(c => ({width: c[1]}));
-  const A = {name: 'Arial', size: 10};
-  const put = (r, v, f) => { const c = ws.getCell(r, 1); c.value = v; c.font = Object.assign({}, A, f || {}); };
-  put(1, 'PECI data analysis report – Workday → Xpertis integration (Poland)', {size: 14, bold: true});
-  put(2, `Generated: ${new Date().toLocaleString('en-GB')} · Prepared by: ${S.who || '–'} · Tool version: ${VER} · Processes analysed: ${procs.length} of ${PROCS.length} (signed off: ${procs.filter(r => r.dt.startsWith('Signed')).length})`, {color: {argb: 'FF66727F'}});
-  put(3, `PL standard data – needed: ${cnt('PL', 'Y')} · not needed: ${cnt('PL', 'N')} · to clarify: ${cnt('PL', 'Q')} · not reviewed: ${cnt('PL', '')}`, {bold: true});
-  put(4, `Optional data – add to PL PECI: ${cnt('Opt', 'A')} · do not add: ${cnt('Opt', 'N')} · to clarify: ${cnt('Opt', 'Q')} · Conversions to Xpertis standard: ${items.filter(r => r.t).length} · Processes with missing data: ${procs.filter(r => r.act === 'Review missing data').length}`, {bold: true});
-  put(5, 'One block per process: a "Process review" row, then every data item of the PL sample file ("PL standard") and every optional item from PECI_XML_Sections_fields.xlsm that Xpertis decided on. "Required in PECI file" = Xpertis decision; "Action for Workday" = what Workday needs to do. Conversion columns describe how the Xpertis staging database converts the value. Process numbers and names follow PECI_XML_Sections_fields.xlsm; example values are masked (A/a = letter, 9 = digit); comments are in the author\'s language. Use the "Response / resolution" column to record answers.', {italic: true, color: {argb: 'FF3A4855'}});
-  const hr = ws.getRow(7); hr.values = cols.map(c => c[0]); hr.height = 42;
-  hr.eachCell((c, i) => { c.font = Object.assign({}, A, {bold: true, color: {argb: 'FFFFFFFF'}}); c.alignment = {vertical: 'middle', wrapText: true};
-    c.fill = {type: 'pattern', pattern: 'solid', fgColor: {argb: i === cols.length ? 'FF1E5DAA' : i >= 14 && i <= 18 ? 'FF2B3A48' : 'FF17232E'}}; });
-  if (!rows.length) { const c = ws.getCell(8, 1); c.value = 'No analysis data yet.'; c.font = Object.assign({}, A, {italic: true}); }
-  rows.forEach((r, i) => { const row = ws.getRow(8 + i);
-    row.values = [i + 1, r.pid, r.proc, r.ev, r.file, r.kind, r.sec, r.path, r.fld, r.desc, r.sc, r.type, r.ex, r.need, r.act, r.conv, r.fmt, r.det, r.note, r.by, r.dt, ''];
+  const A = {name: 'Arial', size: 10}, ink = 'FF17232E', line = {style: 'thin', color: {argb: 'FFD9DFE5'}};
+  const fill = argb => ({type: 'pattern', pattern: 'solid', fgColor: {argb}});
+  ws.getCell(1, 1).value = 'PECI data analysis report'; ws.getCell(1, 1).font = Object.assign({}, A, {size: 16, bold: true, color: {argb: ink}}); ws.getRow(1).height = 26;
+  ws.getCell(2, 1).value = `Workday → Xpertis integration (Poland) · Generated ${new Date().toLocaleString('en-GB', {dateStyle: 'medium', timeStyle: 'short'})} · Prepared by ${S.who || '–'}`;
+  ws.getCell(2, 1).font = Object.assign({}, A, {color: {argb: 'FF66727F'}});
+  // wiersz grup i nagłówki kolumn
+  let c0 = 1;
+  G.forEach(([name, col, cs]) => { const c1 = c0 + cs.length - 1; if (c1 > c0) ws.mergeCells(4, c0, 4, c1);
+    const cell = ws.getCell(4, c0); cell.value = name; for (let i = c0; i <= c1; i++) { const x = ws.getCell(4, i); x.fill = fill(col); x.border = {left: i === c0 ? {style: 'thin', color: {argb: 'FFFFFFFF'}} : undefined}; }
+    cell.font = Object.assign({}, A, {bold: true, color: {argb: 'FFFFFFFF'}}); cell.alignment = {vertical: 'middle', horizontal: 'left', indent: 1};
+    for (let i = c0; i <= c1; i++) { const h = ws.getCell(HR, i); h.value = cols[i - 1][0]; h.font = Object.assign({}, A, {bold: true, color: {argb: ink}}); h.fill = fill('FFEEF1F4');
+      h.alignment = {vertical: 'middle', wrapText: true}; h.border = {bottom: {style: 'medium', color: {argb: col}}, left: i === c0 ? {style: 'thin', color: {argb: 'FFC2CBD4'}} : undefined}; }
+    c0 = c1 + 1; });
+  ws.getRow(4).height = 20; ws.getRow(HR).height = 30;
+  if (!rows.length) { const c = ws.getCell(HR + 1, 1); c.value = 'No analysis data yet.'; c.font = Object.assign({}, A, {italic: true}); }
+  const firstCol = new Set(); c0 = 1; G.forEach(g => { firstCol.add(c0); c0 += g[2].length; });
+  rows.forEach((r, i) => { const row = ws.getRow(HR + 1 + i), pr = !!r.proc_row, pend = !pr && r.f === '';
+    const v = {'#': i + 1, 'No.': r.pid, 'Business process': r.proc, 'Data origin': r.kind, 'PECI section': r.sec, 'PECI field': r.fld, 'XML path': r.path, 'Required in PECI file': r.need, 'Action for Workday': r.act,
+      'Conversion': r.conv, 'Target format': r.fmt, 'Conversion details': r.det, 'Comment / question': r.note, 'By': r.by, 'Date': r.dt, 'Response / resolution': '',
+      'Workday description': r.desc, 'PECI data type': r.type, 'Example value (masked)': r.ex, 'Chorus scope': r.sc, 'Event code(s)': r.ev, 'PL sample file': r.file};
+    row.values = cols.map(c => v[c[0]]);
     row.eachCell({includeEmpty: true}, (c, ci) => {
-      const pend = !r.proc_row && r.f === '' && (ci === 14 || ci === 15);
-      c.font = Object.assign({}, A, r.proc_row || ((ci === 14 || ci === 15) && !pend) ? {bold: true} : {}, pend ? {italic: true, color: {argb: 'FF8D98A4'}} : {}, (ci === 8 || ci === 9) && !r.proc_row ? {name: 'Consolas'} : {});
+      const f = Object.assign({}, A);
+      if (pr) Object.assign(f, {bold: true});
+      else if (ci <= 3) f.color = {argb: 'FF8D98A4'};
+      if (ci === C['Data origin'] && !pr) f.color = {argb: r.kind === 'PL standard' ? 'FF1B7446' : 'FF6A3FB5'}, f.bold = true;
+      if (ci === C['PECI field'] || ci === C['XML path']) f.name = 'Consolas';
+      if (ci === C['PECI field'] && !pr) f.bold = true;
+      if ((ci === C['Required in PECI file'] || ci === C['Action for Workday']) && !pr) { if (pend) Object.assign(f, {italic: true, color: {argb: 'FF8D98A4'}}); else f.bold = true; }
+      if (ci >= C['Workday description'] && !pr) f.color = {argb: 'FF3A4855'};
+      c.font = f;
       c.alignment = {vertical: 'top', wrapText: true, horizontal: ci <= 2 ? 'left' : undefined};
-      c.border = r.proc_row ? {top: {style: 'thin', color: {argb: 'FF8D98A4'}}, bottom: {style: 'thin', color: {argb: 'FFD9DFE5'}}} : {bottom: {style: 'thin', color: {argb: 'FFD9DFE5'}}};
-      let fl = r.proc_row ? FILL.P : null;
-      if (ci === 14 && r.f && FILL[r.f]) fl = FILL[r.f];
-      if (ci === 15 && (r.act === 'Add field to PL PECI output' || r.act === 'Answer question' || r.act === 'Review missing data')) fl = r.act === 'Add field to PL PECI output' ? FILL.A : FILL.Q;
-      if (ci === 16 && r.t) fl = FILL.T;
-      if (ci === cols.length && !r.proc_row) fl = 'FFF4F8FD';
-      if (fl) c.fill = {type: 'pattern', pattern: 'solid', fgColor: {argb: fl}}; }); });
-  ws.autoFilter = {from: {row: 7, column: 1}, to: {row: 7 + Math.max(rows.length, 1), column: cols.length}};
+      c.border = pr ? {top: {style: 'thin', color: {argb: 'FF8D98A4'}}, bottom: line, left: firstCol.has(ci) ? {style: 'thin', color: {argb: 'FFC2CBD4'}} : undefined}
+        : {bottom: line, left: firstCol.has(ci) ? {style: 'thin', color: {argb: 'FFC2CBD4'}} : undefined};
+      let fl = pr ? 'FFF4F6F8' : null;
+      if (ci === C['Required in PECI file'] && r.f && FILL[r.f]) fl = FILL[r.f];
+      if (ci === C['Action for Workday'] && /^(Add field|Answer question|Review missing)/.test(r.act)) fl = /^Add/.test(r.act) ? FILL.A : FILL.Q;
+      if (ci === C['Conversion'] && r.t) fl = FILL.T;
+      if (ci === C['Response / resolution'] && !pr) fl = 'FFF7FAFE';
+      if (fl) c.fill = fill(fl); }); });
+  ws.autoFilter = {from: {row: HR, column: 1}, to: {row: HR + Math.max(rows.length, 1), column: NC}};
   const buf = await wb.xlsx.writeBuffer();
   download(`PECI_data_analysis_report_${ymd()}.xlsx`, new Blob([buf], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
   toast(rows.length ? T('Pobrano PECI data analysis report ({n} pozycji).', {n: items.length}) : T('Pobrano PECI data analysis report – na razie bez pozycji.'));
