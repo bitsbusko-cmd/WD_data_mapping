@@ -344,7 +344,7 @@ table.fx tr.c td.p{color:var(--tr);font-weight:600}
 (() => {
 'use strict';
 const D = JSON.parse(document.getElementById('data').textContent);
-const VER = '04.11 14:25';
+const VER = '04.11 14:36';
 const EN = JSON.parse(document.getElementById('en').textContent);
 const LS = 'wdx:v1', LSL = 'wdx:lang';
 const $ = (s, r = document) => r.querySelector(s);
@@ -498,7 +498,7 @@ function renderStart() {
     return `<tr class="click" data-act="open" data-p="${p.id}"><td class="mono">${pNo(p)}</td><td><span class="pcell">${pIcon(p)}<b>${esc(pName(p))}</b></span></td><td class="sm">${esc(p.ev)}</td><td class="sm">${src}</td><td class="n">${p.std ? s.n : '–'}</td><td class="n">${p.adds.length}</td><td class="n">${s.addY}</td><td>${status}</td></tr>`; }).join('');
   return `<div class="card start">${mobileSelect()}
     <div class="dash"><div><h1>${esc(T('Dashboard analizy'))}</h1><p class="sm muted">${esc(T('Zatwierdzone: {a} z {b} procesów · w toku: {c}', {a: PROCS.filter(p => stats(p).done).length, b: PROCS.length, c: PROCS.filter(p => { const s = stats(p); return s.started && !s.done; }).length}))}</p></div>
-    <div class="acts"><a class="btn pri" href="#p/${next.id}">${esc(stats(next).started ? T('Kontynuuj: proces {n}', {n: pNo(next)}) : T('Zacznij od procesu {n}', {n: pNo(next)}))}</a><button type="button" class="btn" data-act="xlsx" title="${esc(T('Raport Excel po angielsku – jeden arkusz ze wszystkimi ustaleniami analizy'))}">${ic('sheet')}${esc(T('Pobierz: {r}', {r: 'PECI data analysis report'}))}</button></div></div>
+    <div class="acts"><a class="btn pri" href="#p/${next.id}">${esc(stats(next).started ? T('Kontynuuj: proces {n}', {n: pNo(next)}) : T('Zacznij od procesu {n}', {n: pNo(next)}))}</a></div></div>
     <div class="tblwrap"><table class="ov"><thead><tr><th>${esc(T('Nr'))}</th><th>${esc(T('Proces'))}</th><th>${esc(T('Kody zdarzeń'))}</th><th>${esc(T('Plik PECI PL'))}</th><th class="n">${esc(T('Standard PL'))}</th><th class="n">${esc(T('Opcjonalne w xlsm'))}</th><th class="n">${esc(T('Do dodania'))}</th><th>${esc(T('Status'))}</th></tr></thead><tbody>${rows}</tbody></table></div>
   </div>`;
 }
