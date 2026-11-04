@@ -17,7 +17,7 @@ Analiza procesu ma trzy kroki:
 
 Na koniec **Raport Excel** zbiera wszystkie decyzje w czterech arkuszach: Podsumowanie, Standard PL, Transformacje, Dane opcjonalne.
 
-**Raport dla Workday (EN)** (dashboard albo menu „…”) to jeden arkusz po angielsku dla zespołu technicznego Workday: pola do dodania do PECI PL, pytania („do wyjaśnienia”) i zgłoszone braki – z sekcją, ścieżką XML, opisem z PECI Dictionary, źródłem wymagania i kolumną na odpowiedź Workday.
+**Raport dla Workday (EN)** (dashboard albo menu „…”) to jeden arkusz po angielsku dla zespołu technicznego Workday ze wszystkimi ustaleniami analizy: dla każdego procesu wiersz podsumowania (kompletność, braki, uwagi, zatwierdzenie), każda dana ze standardu PL i każda dana opcjonalna z decyzją – czy jest potrzebna w pliku PECI, co ma zrobić Workday, transformacja do standardu Xpertis (format, szczegóły), komentarz i kolumna na odpowiedź Workday.
 
 ## Źródła
 
@@ -35,7 +35,7 @@ Przy pierwszym wejściu narzędzie prosi o imię i zespół (Xpertis, Workday, S
 <a id="english"></a>
 ## English
 
-A simple tool for the Xpertis team to go process by process (the 32 processes of `PECI_XML_Sections_fields.xlsm`) through the data Workday sends in the PECI file in the Polish configuration. Each process shows the **PL standard** (data in the PL sample file) and **optional data** (fields `PECI_XML_Sections_fields.xlsm` lists for the process that are not in the standard). Three steps: data completeness (standard and optional data, including whether to add optional data to PL PECI), conversion to the Xpertis format for everything that will reach Xpertis, and confirmation with sign-off. The **Excel report** collects all decisions. The **Report for Workday (EN)** is a single English sheet for the Workday technical team: fields to add to the PL PECI output, questions and reported gaps, with section, XML path, PECI Dictionary description, requirement source and a column for Workday's response. On first use the tool asks for your name and team (Xpertis, Workday, Saint-Gobain), saved with every decision and in the report. Decisions are saved in the browser and can be exchanged as a JSON file. Personal values from the samples are masked.
+A simple tool for the Xpertis team to go process by process (the 32 processes of `PECI_XML_Sections_fields.xlsm`) through the data Workday sends in the PECI file in the Polish configuration. Each process shows the **PL standard** (data in the PL sample file) and **optional data** (fields `PECI_XML_Sections_fields.xlsm` lists for the process that are not in the standard). Three steps: data completeness (standard and optional data, including whether to add optional data to PL PECI), conversion to the Xpertis format for everything that will reach Xpertis, and confirmation with sign-off. The **Excel report** collects all decisions. The **Report for Workday (EN)** is a single English sheet for the Workday technical team with all analysis results: a review row per process (completeness, gaps, notes, sign-off), every PL standard item and every optional item with a decision – whether it is required in the PECI file, the action for Workday, conversion to the Xpertis standard (format, details), comments and a column for Workday's response. On first use the tool asks for your name and team (Xpertis, Workday, Saint-Gobain), saved with every decision and in the report. Decisions are saved in the browser and can be exchanged as a JSON file. Personal values from the samples are masked.
 
 ## Biblioteki · Libraries
 
