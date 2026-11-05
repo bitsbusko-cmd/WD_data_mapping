@@ -14,33 +14,40 @@ const json = (status, body) => new Response(JSON.stringify(body), {
   status, headers: {'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff'}});
 
 function mode(env) {
-  if (env.TEAM_DOMAIN && env.POLICY_AUD) return 'access';
+  if (String(env.TEAM_DOMAIN || '').trim() && audOf(env)) return 'access';
   if (typeof env.TEAM_KEY === 'string' && env.TEAM_KEY.length >= 10) return 'key';
   return '';
 }
 
 const b64u = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4)), c => c.charCodeAt(0));
 
-async function accessOk(request, env) {
+const teamOf = env => { const t = String(env.TEAM_DOMAIN || '').trim().replace(/\/+$/, ''); return /^https?:\/\//.test(t) ? t : 'https://' + t; };
+const audOf = env => String(env.POLICY_AUD || '').trim();
+
+// '' = token poprawny; inaczej powód odrzucenia (widoczny w api.php?ping, żeby łatwo znaleźć błąd w ustawieniach)
+async function accessCheck(request, env) {
   const token = request.headers.get('Cf-Access-Jwt-Assertion') || '';
+  if (!token) return 'no-token';
   const parts = token.split('.');
-  if (parts.length !== 3) return false;
+  if (parts.length !== 3) return 'bad-token';
   let head, claims;
-  try { head = JSON.parse(new TextDecoder().decode(b64u(parts[0]))); claims = JSON.parse(new TextDecoder().decode(b64u(parts[1]))); } catch (e) { return false; }
-  if (head.alg !== 'RS256') return false;
-  const team = env.TEAM_DOMAIN.replace(/\/+$/, '');
-  if (!jwks || Date.now() - jwksAt > 3600e3) {
-    const r = await fetch(team + '/cdn-cgi/access/certs');
-    if (!r.ok) return false;
+  try { head = JSON.parse(new TextDecoder().decode(b64u(parts[0]))); claims = JSON.parse(new TextDecoder().decode(b64u(parts[1]))); } catch (e) { return 'bad-token'; }
+  if (head.alg !== 'RS256') return 'bad-token';
+  const team = teamOf(env);
+  if (claims.iss !== team) return 'team-mismatch';
+  if (![].concat(claims.aud || []).includes(audOf(env))) return 'aud-mismatch';
+  const now = Date.now() / 1000;
+  if (!(claims.exp > now) || (claims.nbf && claims.nbf > now + 60)) return 'expired';
+  if (!jwks || Date.now() - jwksAt > 3600e3 || !jwks.some(k => k.kid === head.kid)) {
+    let r; try { r = await fetch(team + '/cdn-cgi/access/certs'); } catch (e) { return 'certs-unreachable'; }
+    if (!r.ok) return 'certs-unreachable';
     jwks = (await r.json()).keys || []; jwksAt = Date.now();
   }
   const jwk = jwks.find(k => k.kid === head.kid);
-  if (!jwk) { jwks = null; return false; }
+  if (!jwk) return 'unknown-key';
   const key = await crypto.subtle.importKey('jwk', jwk, {name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256'}, false, ['verify']);
   const ok = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, b64u(parts[2]), new TextEncoder().encode(parts[0] + '.' + parts[1]));
-  if (!ok) return false;
-  const now = Date.now() / 1000, aud = [].concat(claims.aud || []);
-  return claims.iss === team && aud.includes(env.POLICY_AUD) && claims.exp > now && (!claims.nbf || claims.nbf <= now + 60);
+  return ok ? '' : 'bad-signature';
 }
 
 function keyOk(request, env) {
@@ -60,9 +67,19 @@ async function setup(db) {
 
 async function api(request, env) {
   const url = new URL(request.url), m = mode(env);
-  if (url.searchParams.has('ping')) return json(200, {app: 'wd-xpertis', v: 1, configured: !!(m && env.DB), auth: m === 'access' ? 'access' : 'key'});
+  if (url.searchParams.has('ping')) {
+    const out = {app: 'wd-xpertis', v: 1, configured: !!(m && env.DB), auth: m === 'access' ? 'access' : 'key', db: !!env.DB};
+    if (m === 'access') {
+      const tok = request.headers.get('Cf-Access-Jwt-Assertion') || '';
+      let iss = '', aud = [];
+      try { const c = JSON.parse(new TextDecoder().decode(b64u(tok.split('.')[1] || ''))); iss = c.iss || ''; aud = [].concat(c.aud || []); } catch (e) {}
+      out.check = {team: teamOf(env), aud: audOf(env).slice(0, 8) + '…', tokenTeam: iss, tokenAud: aud.map(x => String(x).slice(0, 8) + '…'), result: (await accessCheck(request, env)) || 'ok'};
+    }
+    return json(200, out);
+  }
   if (!m || !env.DB) return json(503, {error: 'config'});
-  if (m === 'access' ? !(await accessOk(request, env)) : !keyOk(request, env)) return json(401, {error: 'auth'});
+  const why = m === 'access' ? await accessCheck(request, env) : (keyOk(request, env) ? '' : 'key');
+  if (why) return json(401, {error: 'auth', why});
   const db = env.DB;
   await setup(db);
   if (request.method === 'GET') {
