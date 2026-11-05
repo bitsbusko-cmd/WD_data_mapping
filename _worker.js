@@ -2,7 +2,7 @@
 // Obsługuje adres /api.php tak samo jak api.php z hostingu PHP; pozostałe adresy to pliki strony.
 // Ustawienia projektu Pages:
 //   DB          – powiązanie z bazą D1 (Settings → Bindings → D1 database)
-//   TEAM_DOMAIN – adres zespołu Cloudflare Access, np. https://saint-gobain-pl.cloudflareaccess.com
+//   TEAM_DOMAIN – adres zespołu Cloudflare Access, np. https://wd-xpertis.cloudflareaccess.com
 //   POLICY_AUD  – Application Audience (AUD) Tag aplikacji Access
 //   TEAM_KEY    – (zamiast Access) hasło zespołu, co najmniej 10 znaków, jako sekret
 
