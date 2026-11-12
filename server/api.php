@@ -45,7 +45,7 @@ $in = json_decode($body ?: '', true);
 if (!is_array($in) || !isset($in['ch']) || !is_array($in['ch']) || count($in['ch']) > 20000) out(400, ['error' => 'input']);
 
 $FIELDS = ['n', 't', 'fmt', 'det', 'note', 'why', 'fmtTouched', 'ts', 'by', 'ok', 'miss', 'notes', 'done',
-  'k', 'ty', 'to', 'tx', 'nm', 'tm', 'at', 'rby', 'rat', 'rn']; // ostatnie: wpisy dyskusji przy danych
+  'k', 'ty', 'to', 'tx', 'nm', 'tm', 'at', 'rby', 'rat', 'rn', 'ev', 'ref']; // ostatnie: wpisy dyskusji i historia próśb
 $acc = 0;
 foreach ($in['ch'] as $c) {
   if (!is_array($c) || count($c) !== 2) continue;

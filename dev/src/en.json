@@ -372,7 +372,7 @@
 "Otwórz wątek": "Open thread",
 "Oznacz jako rozwiązane": "Mark as resolved",
 "Piszesz jako": "Posting as",
-"Pod przyciskami decyzji każdej danej jest przycisk dyskusji. Można dodać komentarz albo prośbę o decyzję skierowaną do zespołu (Xpertis, Chorus, Saint-Gobain). Prośbę zamyka pole „Rozwiązane” – zapisujemy, kto i kiedy ją rozwiązał, oraz krótkie ustalenie. Prośby czekające na zespoły widać na stronie Status, a wszystkie wpisy – w arkuszu „Discussions” raportu Excel.": "Below the decision buttons of each data item there is a discussion button. You can add a comment or a decision request addressed to a team (Xpertis, Chorus, Saint-Gobain). A request is closed with the “Resolved” box – the app saves who resolved it and when, plus a short resolution. Requests waiting for teams are listed on the Status page, and all entries in the “Discussions” sheet of the Excel report.",
+"Pod przyciskami decyzji każdej danej jest przycisk dyskusji. Można dodać komentarz albo prośbę o decyzję skierowaną do zespołu (Xpertis, Chorus, Saint-Gobain). Prośbę zamyka pole „Rozwiązane” – zapisujemy, kto i kiedy ją rozwiązał, oraz krótkie ustalenie; każde rozwiązanie i ponowne otwarcie zostaje w historii wątku. Prośby czekające na zespoły widać na stronie Status, a wszystkie wpisy – w arkuszu „Discussions” raportu Excel.": "Below the decision buttons of each data item there is a discussion button. You can add a comment or a decision request addressed to a team (Xpertis, Chorus, Saint-Gobain). A request is closed with the “Resolved” box – the app saves who resolved it and when, plus a short resolution; every resolution and reopening stays in the thread history. Requests waiting for teams are listed on the Status page, and all entries in the “Discussions” sheet of the Excel report.",
 "Pokaż wszystkie ({n})": "Show all ({n})",
 "Proces {n}": "Process {n}",
 "Prośba o decyzję": "Decision request",
@@ -413,5 +413,10 @@
 "{n} wpisy": "{n} entries",
 "{n} wpisy w wątku": "{n} entries in thread",
 "{n} wpisów": "{n} entries",
-"{n} wpisów w wątku": "{n} entries in thread"
+"{n} wpisów w wątku": "{n} entries in thread",
+"Rozwiązano": "Resolved",
+"Otwarto ponownie": "Reopened",
+"prośbę do zespołu {t}": "the request to team {t}",
+"prośbę „{q}” do zespołu {t}": "the request “{q}” to team {t}",
+"Otwarto ponownie: {w}": "Reopened by: {w}"
 }

@@ -448,3 +448,11 @@ table.fx tr.c td.p{color:var(--tr);font-weight:600}
   .cbar .hint,.cbar .grow{display:none}
   .th-list{padding:0 10px}.th-comp{padding:10px}
 }
+/* historia próśb: zmiany statusu w wątku */
+.th-list .evt{display:flex;align-items:flex-start;gap:8px;padding:8px 0 8px 42px;border-top:1px solid var(--line);font-size:.8rem;line-height:1.45;color:var(--muted)}
+.evt .ic{width:14px;height:14px;margin-top:2px;stroke-width:2.2}
+.evt.res .ic{color:var(--need)}.evt.reo .ic{color:var(--ask)}
+.evt b{color:var(--ink2);font-weight:700}
+.evt span{min-width:0;overflow-wrap:anywhere}
+.iq .by .ic{width:13px;height:13px;color:var(--ask)}
+@media (max-width:860px){.th-list .evt{padding-left:0}}

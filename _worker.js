@@ -7,7 +7,7 @@
 //   TEAM_KEY    – (zamiast Access) hasło zespołu, co najmniej 10 znaków, jako sekret
 
 const FIELDS = ['n', 't', 'fmt', 'det', 'note', 'why', 'fmtTouched', 'ts', 'by', 'ok', 'miss', 'notes', 'done',
-  'k', 'ty', 'to', 'tx', 'nm', 'tm', 'at', 'rby', 'rat', 'rn']; // ostatnie: wpisy dyskusji przy danych
+  'k', 'ty', 'to', 'tx', 'nm', 'tm', 'at', 'rby', 'rat', 'rn', 'ev', 'ref']; // ostatnie: wpisy dyskusji i historia próśb
 const ID_RE = /^\d{1,3}\|[facm]\|.{0,400}$/u;
 let ready = false, jwks = null, jwksAt = 0;
 
