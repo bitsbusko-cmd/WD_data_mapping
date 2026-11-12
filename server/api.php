@@ -44,12 +44,13 @@ $body = file_get_contents('php://input', false, null, 0, 8 * 1024 * 1024);
 $in = json_decode($body ?: '', true);
 if (!is_array($in) || !isset($in['ch']) || !is_array($in['ch']) || count($in['ch']) > 20000) out(400, ['error' => 'input']);
 
-$FIELDS = ['n', 't', 'fmt', 'det', 'note', 'why', 'fmtTouched', 'ts', 'by', 'ok', 'miss', 'notes', 'done'];
+$FIELDS = ['n', 't', 'fmt', 'det', 'note', 'why', 'fmtTouched', 'ts', 'by', 'ok', 'miss', 'notes', 'done',
+  'k', 'ty', 'to', 'tx', 'nm', 'tm', 'at', 'rby', 'rat', 'rn']; // ostatnie: wpisy dyskusji przy danych
 $acc = 0;
 foreach ($in['ch'] as $c) {
   if (!is_array($c) || count($c) !== 2) continue;
   [$id, $v] = $c;
-  if (!is_string($id) || !preg_match('/^\d{1,3}\|[fac]\|.{0,400}$/u', $id) || !is_array($v)) continue;
+  if (!is_string($id) || !preg_match('/^\d{1,3}\|[facm]\|.{0,400}$/u', $id) || !is_array($v)) continue;
   $clean = [];
   foreach ($FIELDS as $f) if (array_key_exists($f, $v)) {
     $x = $v[$f];

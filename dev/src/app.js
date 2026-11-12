@@ -11,6 +11,8 @@ let LANG = (new URLSearchParams(location.search).get('lang') || store.get(LSL) |
 const T = (s, v) => { let r = LANG === 'en' && EN[s] != null ? EN[s] : s; if (v) r = r.replace(/\{(\w+)\}/g, (m, k) => v[k] != null ? v[k] : m); return r; };
 const IC = {
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  chat: '<path d="M20 12a8 8 0 0 1-11.7 7.1L4 20l1-4.1A8 8 0 1 1 20 12z"/>', flag: '<path d="M5 21V4"/><path d="M5 4h12l-2.5 4L17 12H5"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', down: '<path d="m6 9 6 6 6-6"/>',
   check: '<path d="M20 6 9 17l-5-5"/>', file: '<path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5"/>',
   warn: '<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>', x: '<path d="M18 6 6 18M6 6l12 12"/>',
@@ -19,7 +21,7 @@ const IC = {
   load: '<path d="M12 15V3m0 0L8 7m4-4 4 4"/><path d="M4 17v3h16v-3"/>', trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
   plus: '<path d="M12 5v14M5 12h14"/>', left: '<path d="m15 18-6-6 6-6"/>', right: '<path d="m9 18 6-6-6-6"/>', dot: '<circle cx="12" cy="12" r="4"/>', ring: '<circle cx="12" cy="12" r="7"/>'
 };
-const ic = n => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${IC[n]}</svg>`;
+const ic = (n, c) => `<svg class="ic${c ? ' ' + c : ''}" viewBox="0 0 24 24" aria-hidden="true">${IC[n]}</svg>`;
 
 /* ---------- dane ---------- */
 const FILES = {}; D.files.forEach(f => { FILES[f.id] = f; });
@@ -65,14 +67,14 @@ const scopeTxt = sc => sc === 'Y' ? T('w zakresie Chorus') : sc === 'N' ? T('poz
 /* ---------- stan ---------- */
 let S = {who: '', name: '', team: '', d: {}};
 try { const raw = store.get(LS); if (raw) { const o = JSON.parse(raw); if (o && o.d) S = o; } } catch (e) {}
-const V = {p: null, step: 1, q: '', flt: 'all', open: {}, dq: '', dscope: true, lflt: 'all', menu: false, modal: null};
+const V = {p: null, step: 1, q: '', flt: 'all', open: {}, dq: '', dscope: true, lflt: 'all', menu: false, modal: null, thr: {}, cmp: {}, ib: '', ibAll: false, jump: null, focusTh: null};
 const saveLocal = () => store.set(LS, JSON.stringify(S));
 const save = () => { saveLocal(); if (SH.on && SH.ok) pushSoon(); };
 const TEAMS = ['Xpertis', 'Chorus', 'Saint-Gobain'];
 if (S.team === 'Workday') { S.team = 'Chorus'; S.who = S.name + ' · Chorus'; store.set(LS, JSON.stringify(S)); }
 const known = () => !!(S.name && S.team);
 const now = () => new Date().toISOString();
-const pd = id => (S.d[id] = S.d[id] || {f: {}, a: {}, c: {}});
+const pd = id => { const d = S.d[id] = S.d[id] || {f: {}, a: {}, c: {}}; if (!d.m) d.m = {}; return d; };
 const stamp = o => { o.ts = now(); o.by = S.who || ''; return o; };
 const dkey = i => 'd:' + i;
 
@@ -105,6 +107,7 @@ function entries() {
   const out = [];
   Object.keys(S.d).forEach(pid => { const d = S.d[pid];
     ['f', 'a'].forEach(kind => Object.keys(d[kind] || {}).forEach(k => { const v = d[kind][k]; if (v && v.ts) out.push([eid(pid, kind, k), v]); }));
+    Object.keys(d.m || {}).forEach(k => { const v = d.m[k]; if (v && v.ts) out.push([eid(pid, 'm', k), v]); });
     if (d.c && d.c.ts) out.push([eid(pid, 'c'), d.c]); });
   return out;
 }
@@ -125,7 +128,7 @@ function setSync(st) { SH.st = st; if (st === 'ok') SH.at = new Date(); const el
 function applyRemote(list) {
   let n = 0;
   list.forEach(([id, v]) => { const i = id.indexOf('|'), j = id.indexOf('|', i + 1), pid = +id.slice(0, i), kind = id.slice(i + 1, j), k = id.slice(j + 1);
-    if (!PBY[pid] || !v || !v.ts || !/^[fac]$/.test(kind)) return;
+    if (!PBY[pid] || !v || !v.ts || !/^[facm]$/.test(kind)) return;
     const d = pd(pid), cur = kind === 'c' ? d.c : d[kind][k];
     SH.synced[id] = v.ts;
     if (!cur || !cur.ts || v.ts > cur.ts) { if (kind === 'c') d.c = v; else d[kind][k] = v; n++; } });
@@ -188,10 +191,12 @@ async function detectShared() {
 function go(hash) { if (location.hash !== hash) location.hash = hash; else route(); }
 function route() {
   const m = location.hash.match(/^#p\/(\d+)(?:\/(\d))?/);
-  if (m && PBY[+m[1]] != null) { const id = +m[1]; if (V.p !== id) { V.q = ''; V.flt = 'all'; V.open = {}; V.dq = ''; } V.p = id; V.step = m[2] ? Math.min(3, Math.max(1, +m[2])) : 1; }
+  if (m && PBY[+m[1]] != null) { const id = +m[1]; if (V.p !== id) { V.q = ''; V.flt = 'all'; V.open = {}; V.dq = ''; if (!V.jump) V.thr = {}; } V.p = id; V.step = m[2] ? Math.min(3, Math.max(1, +m[2])) : 1; }
   else V.p = null;
   V.menu = false;
   render(); window.scrollTo(0, 0);
+  if (V.jump) { const j = V.jump; V.jump = null; const row = document.querySelector(`.row[data-k="${CSS.escape(j.key)}"]`);
+    if (row) { row.scrollIntoView({block: 'start'}); window.scrollBy(0, -160); const b = row.querySelector('[data-act="thr"]'); if (b) b.focus({preventScroll: true}); } }
   if (SH.ok) sync();
 }
 
@@ -253,8 +258,150 @@ function renderStart() {
     <div class="dash"><h1>${esc(T('Status'))}</h1>
     <div class="acts"><a class="btn pri" href="#p/${next.id}">${esc(stats(next).started ? T('Kontynuuj: proces {n}', {n: pNo(next)}) : T('Zacznij od procesu {n}', {n: pNo(next)}))}</a></div></div>
     ${overall()}
+    ${inboxCard()}
     <div class="tblwrap"><table class="ov"><thead><tr><th>${esc(T('Nr'))}</th><th>${esc(T('Proces'))}</th><th>${esc(T('Kody zdarzeń'))}</th><th>${esc(T('Plik PECI PL'))}</th><th class="n">${esc(T('Standard PL'))}</th><th class="n">${esc(T('Opcjonalne w xlsm'))}</th><th class="n">${esc(T('Do dodania'))}</th><th>${esc(T('Status'))}</th></tr></thead><tbody>${rows}</tbody></table></div>
   </div>`;
+}
+
+/* ---------- dyskusje przy danych ---------- */
+const teamCls = t => ({Xpertis: 't-xp', Chorus: 't-ch', 'Saint-Gobain': 't-sg'})[t] || '';
+const initials = n => (String(n || '?').trim().split(/\s+/).map(w => w[0] || '').join('').slice(0, 2) || '?').toUpperCase();
+const fdt = iso => iso ? new Date(iso).toLocaleString(LANG === 'en' ? 'en-GB' : 'pl-PL', {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'}) : '';
+const plural = (n, f) => T(n === 1 ? f[0] : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)) ? f[1] : f[2], {n});
+const F_WPIS = ['{n} wpis', '{n} wpisy', '{n} wpisów'], F_WPISW = ['{n} wpis w wątku', '{n} wpisy w wątku', '{n} wpisów w wątku'];
+const F_PROS = ['{n} prośba o decyzję', '{n} prośby o decyzję', '{n} próśb o decyzję'], F_KOM = ['komentarz', 'komentarze', 'komentarzy'];
+const F_ROZ = ['{n} rozwiązana', '{n} rozwiązane', '{n} rozwiązanych'], F_OTW = ['{n} otwarta', '{n} otwarte', '{n} otwartych'], F_DNI = ['czeka {n} dzień', 'czeka {n} dni', 'czeka {n} dni'];
+const trunc = (x, n) => { x = String(x || ''); return x.length > n ? x.slice(0, n - 1).replace(/\s+\S*$/, '') + '…' : x; };
+const mkey = (pid, key) => pid + '|' + key;
+const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const safeId = k => String(k).replace(/[^A-Za-z0-9_-]/g, '_');
+const pathTxt = e => [e.s, e.u, e.f].filter(Boolean).join(' › ');
+let TI = {pid: null, map: {}};
+function thrIndex(p) {
+  const d = S.d[p.id], out = {};
+  if (d && d.m) Object.keys(d.m).forEach(id => { const m = d.m[id]; if (m && m.k) (out[m.k] = out[m.k] || []).push(Object.assign({id}, m)); });
+  Object.keys(out).forEach(k => out[k].sort((a, b) => (a.at || '').localeCompare(b.at || '')));
+  return out;
+}
+const thr = key => TI.map[key] || [];
+function thrState(ms) {
+  const reqs = ms.filter(m => m.ty === 'q'), open = reqs.filter(m => !m.done), teams = open.map(m => m.to).filter((t, i, a) => t && a.indexOf(t) === i);
+  return {reqs: reqs.length, open: open.length, solved: reqs.length - open.length, teams,
+    cls: open.length ? 's-wait' : reqs.length ? 's-done' : '',
+    label: open.length ? T('Czeka na: {t}', {t: teams.join(', ')}) : reqs.length ? T('Rozwiązane') : plural(ms.length, F_KOM)};
+}
+function thrChip(p, key, dec) {
+  const ms = thr(key), mk = mkey(p.id, key), open = !!V.thr[mk];
+  const a = `data-act="thr" data-k="${esc(key)}" aria-expanded="${open}"${open ? ` aria-controls="th-${safeId(mk)}"` : ''}`;
+  if (!ms.length) return dec === 'Q'
+    ? `<button type="button" class="thr s-new" ${a}>${ic('plus')}<span>${esc(T('Zadaj pytanie'))}</span></button>`
+    : `<button type="button" class="thr s-ghost" ${a}>${ic('plus')}<span>${esc(T('Komentarz'))}</span></button>`;
+  const st = thrState(ms);
+  return `<button type="button" class="thr ${st.cls}" ${a} title="${esc(T('Dyskusja przy danej'))}">${ic('chat')}<span class="n">${ms.length}</span><span>${esc(st.label)}</span>${ic('down', 'chev')}</button>`;
+}
+function msgHtml(key, m) {
+  const name = m.nm || String(m.by || '').split(' · ')[0] || '?', tc = teamCls(m.tm);
+  const head = `<div class="mhd"><b>${esc(name)}</b>${m.tm ? `<span class="team ${tc}">${esc(m.tm)}</span>` : ''}<time datetime="${esc(m.at || '')}">${esc(fdt(m.at))}</time></div>`;
+  let body = `<p>${esc(m.tx)}</p>`;
+  if (m.ty === 'q') {
+    const done = !!m.done, ka = `data-k="${esc(key)}" data-m="${esc(m.id)}"`, mine = done && m.rby && m.rby === S.who;
+    const note = !done ? '' : mine ? `<div class="ustal"><label for="rn-${esc(m.id)}"><b>${esc(T('Ustalenie'))}</b> ${esc(T('(opcjonalnie)'))}</label><input class="inp" id="rn-${esc(m.id)}" data-act="mnote" ${ka} value="${esc(m.rn || '')}" maxlength="500" placeholder="${esc(T('Krótko: co zdecydowano'))}"></div>`
+      : m.rn ? `<div class="ustal"><b>${esc(T('Ustalenie:'))}</b> ${esc(m.rn)}</div>` : '';
+    body = `<div class="rq${done ? ' done' : ''}"><div class="rqh"><span class="rqk">${ic('flag')}${esc(T('Prośba o decyzję'))}</span><span class="to">${esc(T('do zespołu'))}</span><span class="team ${teamCls(m.to)}">${esc(m.to || '–')}</span>
+      <span class="st">${done ? `<span class="pill done">${ic('check')}${esc(T('Rozwiązana'))}</span>` : `<span class="pill wait">${ic('clock')}${esc(T('Czeka na decyzję'))}</span>`}</span></div>
+      <p>${esc(m.tx)}</p>
+      ${done ? `<div class="rsl"><label class="res"><input type="checkbox" id="rs-${esc(m.id)}" data-act="mres" ${ka} checked>${esc(T('Rozwiązane'))}</label><span class="who">${esc(T('przez'))} <b>${esc(m.rby || '–')}</b> · ${esc(fdt(m.rat))}</span></div>${note}`
+        : `<label class="res"><input type="checkbox" id="rs-${esc(m.id)}" data-act="mres" ${ka}>${esc(T('Oznacz jako rozwiązane'))}</label>`}</div>`;
+  }
+  return `<li class="msg"><span class="av ${tc}" aria-hidden="true">${esc(initials(name))}</span><div class="mbd">${head}${body}</div></li>`;
+}
+function thrPanel(p, key, e, kind, dec) {
+  const mk = mkey(p.id, key); if (!V.thr[mk]) return '';
+  const ms = thr(key), st = thrState(ms), sid = safeId(mk);
+  const c = V.cmp[mk] || (V.cmp[mk] = {tx: '', ty: dec === 'Q' && !st.open ? 'q' : 'c', to: ''});
+  const can = !!c.tx.trim() && (c.ty === 'c' || !!c.to);
+  const info = ms.length ? plural(ms.length, F_WPIS) + (st.reqs ? ' · ' + plural(st.reqs, F_PROS) : '') : T('brak wpisów');
+  const head = `<div class="th-head"><div class="th-title">${ic('chat')}<b>${esc(T('Dyskusja'))}</b><span>${esc(info)}</span></div>
+    <div class="th-pills">${st.open ? `<span class="pill wait">${ic('clock')}${esc(T('Czeka na: {t}', {t: st.teams.join(', ')}))}</span>` : ''}${st.solved ? `<span class="pill done">${ic('check')}${esc(plural(st.solved, F_ROZ))}</span>` : ''}<button type="button" class="btn ghost icon sm" data-act="thr" data-k="${esc(key)}" aria-label="${esc(T('Zwiń dyskusję'))}" title="${esc(T('Zwiń dyskusję'))}">${ic('x')}</button></div></div>`;
+  const list = ms.length ? `<ol class="th-list">${ms.map(m => msgHtml(key, m)).join('')}</ol>` : `<p class="th-empty">${esc(T('Brak wpisów. Zadaj pytanie albo dodaj komentarz – zobaczą go wszyscy użytkownicy.'))}</p>`;
+  const map = kind === 'std' ? DEC : ADD, act = kind === 'std' ? 'need' : 'add';
+  const short = st.reqs && !st.open && dec === 'Q' && V.step === 1 ? `<div class="th-done">${ic('check')}<span>${esc(T('Wszystkie prośby rozwiązane. Ustaw decyzję dla danej:'))}</span><span class="dec" role="group" aria-label="${esc(T('Decyzja'))}"><button type="button" class="${kind === 'std' ? 'y' : 'ad'}" data-act="${act}" data-k="${esc(key)}" data-v="Y" aria-pressed="false">${esc(T(map.Y))}</button><button type="button" class="n" data-act="${act}" data-k="${esc(key)}" data-v="N" aria-pressed="false">${esc(T(map.N))}</button></span></div>` : '';
+  const comp = `<div class="th-comp">${known() ? `<p class="as">${ic('user')}${esc(T('Piszesz jako'))} <b>${esc(S.who)}</b></p>` : ''}
+    <label class="sr" for="mt-${sid}">${esc(T('Treść wpisu'))}</label>
+    <textarea class="inp" id="mt-${sid}" data-act="mtext" data-k="${esc(key)}" rows="2" maxlength="5000" placeholder="${esc(T('Napisz komentarz albo pytanie do zespołu…'))}">${esc(c.tx)}</textarea>
+    <div class="cbar">
+      <label class="fld" for="mk-${sid}">${esc(T('Rodzaj wpisu'))}<select class="inp" id="mk-${sid}" data-act="mkind" data-k="${esc(key)}"><option value="c"${c.ty === 'c' ? ' selected' : ''}>${esc(T('Komentarz'))}</option><option value="q"${c.ty === 'q' ? ' selected' : ''}>${esc(T('Prośba o decyzję'))}</option></select></label>
+      ${c.ty === 'q' ? `<label class="fld" for="mo-${sid}">${esc(T('Kto ma zdecydować?'))}<select class="inp" id="mo-${sid}" data-act="mteam" data-k="${esc(key)}"><option value="">${esc(T('Wybierz zespół'))}</option>${TEAMS.map(t => `<option value="${esc(t)}"${c.to === t ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>` : ''}
+      <span class="grow"></span>
+      <span class="hint" aria-hidden="true"><span class="kbd">Ctrl</span>+<span class="kbd">Enter</span></span>
+      <button type="button" class="btn pri" data-act="madd" data-k="${esc(key)}"${can ? '' : ' disabled'}>${ic('plus')}${esc(T('Dodaj wpis'))}</button>
+    </div>
+    <p class="warnline"${c.ty === 'q' && !c.to && c.tx.trim() ? '' : ' hidden'}>${esc(T('Wybierz zespół, który ma podjąć decyzję.'))}</p></div>`;
+  return `<div class="thread" id="th-${sid}" role="region" aria-label="${esc(T('Dyskusja: {f}', {f: fLabel(e)}))}">${head}${list}${short}${comp}</div>`;
+}
+const cmpOf = (p, key) => { const mk = mkey(p.id, key); return V.cmp[mk] || (V.cmp[mk] = {tx: '', ty: 'c', to: ''}); };
+function updComp(el, c) {
+  const box = el.closest('.th-comp'); if (!box) return;
+  const b = box.querySelector('[data-act="madd"]'), w = box.querySelector('.warnline'), t = c.tx.trim();
+  if (b) b.disabled = !(t && (c.ty === 'c' || c.to)); if (w) w.hidden = !(c.ty === 'q' && !c.to && t);
+}
+function focusComposer() {
+  const mk = V.focusTh; V.focusTh = null; if (!mk) return;
+  const el = document.getElementById('mt-' + safeId(mk)); if (!el) return;
+  el.focus({preventScroll: true}); const r = el.getBoundingClientRect(); if (r.bottom > innerHeight - 8 || r.top < 150) el.scrollIntoView({block: 'center'});
+}
+function autoThread(p, key, n) {
+  if (n !== 'Q') return; const mk = mkey(p.id, key), st = thrState(thr(key));
+  V.thr[mk] = true; if (!V.cmp[mk] || !V.cmp[mk].tx) V.cmp[mk] = {tx: '', ty: st.open ? 'c' : 'q', to: ''}; V.focusTh = mk;
+}
+function addMsg(p, key) {
+  if (!p) return; const mk = mkey(p.id, key), c = V.cmp[mk]; if (!c) return;
+  const tx = c.tx.trim(); if (!tx || (c.ty === 'q' && !c.to)) return;
+  if (!known()) { openModal('who'); return; }
+  const t = now();
+  pd(p.id).m[newId()] = {k: key, ty: c.ty, to: c.ty === 'q' ? c.to : '', tx: tx.slice(0, 5000), nm: S.name, tm: S.team, by: S.who, at: t, ts: t};
+  V.cmp[mk] = {tx: '', ty: 'c', to: ''}; V.thr[mk] = true; V.focusTh = mk;
+  save(); rerenderKeep(); focusComposer();
+  if (c.ty === 'q') toast(T('Dodano prośbę o decyzję do zespołu {t}.', {t: c.to}));
+}
+function resMsg(p, id, on) {
+  const x = pd(p.id).m[id]; if (!x) return;
+  x.done = !!on; if (on) { x.rby = S.who; x.rat = now(); } else { x.rby = ''; x.rat = ''; }
+  x.ts = now(); save(); rerenderKeep();
+  if (on) { const n = document.getElementById('rn-' + id); if (n) n.focus({preventScroll: true}); }
+}
+function itemOf(p, key) {
+  if (/^d:/.test(key)) { const x = D.dict[+key.slice(2)]; return x ? {s: x.s, u: x.u.replace(/ /g, '_'), f: x.f.replace(/ /g, '_'), pl: x.pl} : null; }
+  if (/^r:/.test(key)) return p.adds.find(z => 'r:' + z.k === key) || null;
+  return field(p, key) || null;
+}
+function openThread(pid, key) {
+  V.thr = {[mkey(pid, key)]: true}; V.jump = {pid, key}; V.flt = 'all'; V.q = '';
+  if (/^d:/.test(key)) { V.dictOpen = true; V.dq = ''; }
+  go('#p/' + pid + '/1');
+}
+const ageTxt = iso => { const d = Math.floor((Date.now() - new Date(iso).getTime()) / 864e5); return d <= 0 ? T('od dziś') : plural(d, F_DNI); };
+function inboxCard() {
+  const all = [];
+  PROCS.forEach(p => { const d = S.d[p.id]; if (!d || !d.m) return; const idx = thrIndex(p);
+    Object.keys(idx).forEach(key => { const e = itemOf(p, key); if (!e) return; idx[key].forEach(m => { if (m.ty === 'q') all.push({p, key, e, m, n: idx[key].length}); }); }); });
+  const head = (sub, seg) => `<div class="ibh"><h2 id="ib-h">${ic('flag')}${esc(T('Prośby o decyzję'))}${sub ? ` <span class="sub">${esc(sub)}</span>` : ''}</h2>${seg || ''}</div>`;
+  if (!all.length) return `<section class="inbox" aria-labelledby="ib-h">${head('')}<p class="ib-empty">${esc(T('Brak próśb o decyzję. Prośbę dodasz w dyskusji przy danej – przycisk pod decyzją w kroku 1.'))}</p></section>`;
+  const open = all.filter(x => !x.m.done).sort((a, b) => (a.m.at || '').localeCompare(b.m.at || ''));
+  const solved = all.filter(x => x.m.done).sort((a, b) => (b.m.rat || '').localeCompare(a.m.rat || ''));
+  const mine = open.filter(x => x.m.to === S.team);
+  const f = V.ib || (mine.length ? 'mine' : 'open'), list = f === 'mine' ? mine : f === 'done' ? solved : open;
+  const segs = [['mine', T('Do mojego zespołu ({t})', {t: S.team || '–'}), mine.length], ['open', T('Wszystkie otwarte'), open.length], ['done', T('Rozwiązane'), solved.length]];
+  const seg = `<div class="seg" role="group" aria-label="${esc(T('Filtr próśb'))}">${segs.map(x => `<button type="button" data-act="ib" data-v="${x[0]}" aria-pressed="${f === x[0]}">${esc(x[1])} ${x[2]}</button>`).join('')}</div>`;
+  const shown = V.ibAll ? list : list.slice(0, 8);
+  const rows = shown.map(x => `<div class="irow">
+      <div class="ito">${x.m.done ? `<span class="pill done">${ic('check')}${esc(T('Rozwiązana'))}</span><span class="age">${esc(fdt(x.m.rat))}</span>` : `<span class="team ${teamCls(x.m.to)}">→ ${esc(x.m.to || '–')}</span><span class="age">${esc(ageTxt(x.m.at))}</span>`}</div>
+      <div class="iwhat"><div class="pr">${pIcon(x.p)}<span>${esc(T('Proces {n}', {n: pNo(x.p)}))} · ${esc(pName(x.p))}</span></div><div class="fl">${esc(fLabel(x.e))}</div><div class="px">${esc(pathTxt(x.e))}</div></div>
+      <div class="iq"><p>${esc(trunc(x.m.tx, 240))}</p><div class="by">${x.m.tm ? `<span class="team ${teamCls(x.m.tm)}">${esc(x.m.tm)}</span>` : ''}<span>${esc([x.m.nm || '', fdt(x.m.at), plural(x.n, F_WPISW)].filter(Boolean).join(' · '))}</span></div>
+        ${x.m.done ? `<div class="by">${esc(T('Rozwiązał(a): {w}', {w: x.m.rby || '–'}))}${x.m.rn ? ' · ' + esc(T('Ustalenie:')) + ' ' + esc(trunc(x.m.rn, 160)) : ''}</div>` : ''}</div>
+      <button type="button" class="btn sm" data-act="gothr" data-p="${x.p.id}" data-k="${esc(x.key)}">${esc(T('Otwórz wątek'))}</button></div>`).join('');
+  const empty = f === 'mine' ? T('Nic nie czeka na decyzję Twojego zespołu.') : f === 'done' ? T('Brak rozwiązanych próśb.') : T('Brak otwartych próśb.');
+  return `<section class="inbox" aria-labelledby="ib-h">${head(plural(open.length, F_OTW) + ' · ' + plural(solved.length, F_ROZ), seg)}${rows || `<p class="ib-empty">${esc(empty)}</p>`}${list.length > shown.length ? `<div class="ifoot"><button type="button" class="btn sm" data-act="iball">${esc(T('Pokaż wszystkie ({n})', {n: list.length}))}</button></div>` : ''}</section>`;
 }
 
 /* ---------- proces ---------- */
@@ -320,20 +467,20 @@ function fieldRow(p, e) {
   return `<div class="row k-std${x.n === 'N' ? ' dim' : ''}" data-k="${esc(e.k)}">
     <div class="fn"><div class="lb">${esc(fLabel(e))}</div><div class="px">${pathHtml(e)}</div>${stdLine(e)}<button type="button" class="lnk" data-act="more" data-k="${esc(e.k)}" aria-expanded="${!!open}">${esc(T(open ? 'Ukryj szczegóły' : 'Szczegóły'))}</button></div>
     <div class="ex"><span class="tag t">${esc(tName(e.t))}</span>${vals(e)}${flagTags(e)}</div>
-    ${decBtns(e.k, x.n, DEC, ['y', 'n', 'q'], 'need')}
-    ${open ? moreHtml(e, note) : ''}</div>`;
+    <div class="decw">${decBtns(e.k, x.n, DEC, ['y', 'n', 'q'], 'need')}${thrChip(p, e.k, x.n)}</div>
+    ${open ? moreHtml(e, note) : ''}${thrPanel(p, e.k, e, 'std', x.n)}</div>`;
 }
 function filterBar(counts, kinds) {
   return `<div class="bar2"><input class="inp" type="search" data-act="q" value="${esc(V.q)}" placeholder="${esc(T('Szukaj pola'))}" aria-label="${esc(T('Szukaj pola'))}">
-    ${kinds.map(k => `<button type="button" class="chipbtn" data-act="flt" data-v="${k[0]}" aria-pressed="${V.flt === k[0]}">${esc(T(k[1]))} ${counts[k[0]] != null ? counts[k[0]] : ''}</button>`).join('')}</div>`;
+    ${kinds.map(k => `<button type="button" class="chipbtn${k[2] ? ' ' + k[2] : ''}" data-act="flt" data-v="${k[0]}" aria-pressed="${V.flt === k[0]}">${esc(T(k[1]))} ${counts[k[0]] != null ? counts[k[0]] : ''}</button>`).join('')}</div>`;
 }
 const dictItems = p => (p.dadd || []).map(i => { const x = D.dict[i]; return {k: dkey(i), dd: i, s: x.s, u: x.u.replace(/ /g, '_'), f: x.f.replace(/ /g, '_'), pl: x.pl, t: '', v: [], sc: x.sc}; });
 function dictBlock(p, open) {
   const d = pd(p.id), q = V.dq.trim().toLowerCase(), dl = dictItems(p);
   if (!dl.length) return '';
   const inScope = dl.filter(e => e.sc !== 'N').length;
-  const shown = dl.filter(e => (!V.dscope || e.sc !== 'N' || (d.a[e.k] && d.a[e.k].n)) && (!q || [e.f, e.pl, e.u, e.s, D.dict[e.dd].d].some(z => z && String(z).toLowerCase().includes(q))));
-  const decided = dl.filter(e => d.a[e.k] && d.a[e.k].n).length;
+  const shown = dl.filter(e => (!V.dscope || e.sc !== 'N' || (d.a[e.k] && d.a[e.k].n) || thr(e.k).length) && (!q || [e.f, e.pl, e.u, e.s, D.dict[e.dd].d].some(z => z && String(z).toLowerCase().includes(q))));
+  const decided = dl.filter(e => (d.a[e.k] && d.a[e.k].n) || thr(e.k).length).length;
   return `<details class="dict" ${open || V.dictOpen || decided ? 'open' : ''} data-act="dict"><summary>${esc(T('Pozostałe pola z arkusza PECI Dictionary w sekcjach tego procesu'))} <small>${esc(T('{a} pól, w tym {b} w zakresie Chorus · decyzja opcjonalna', {a: dl.length, b: inScope}))}</small></summary><div class="inner">
     <div class="bar2"><input class="inp" type="search" data-act="dq" value="${esc(V.dq)}" placeholder="${esc(T('Szukaj w PECI Dictionary'))}" aria-label="${esc(T('Szukaj w PECI Dictionary'))}"><label class="sm" style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-act="dscope" ${V.dscope ? 'checked' : ''}>${esc(T('Tylko pola w zakresie Chorus'))}</label><span class="sm muted">${esc(T('Pokazano {a} z {b}', {a: shown.length, b: dl.length}))}</span></div>
     ${groupBySec(shown).map(g => `<section class="sec"><div class="sech"><h3>${esc(secName(g.s))} <code>${esc(g.s)}</code></h3></div>${g.items.map(e => addRow(p, e, e.k, true)).join('')}</section>`).join('') || `<div class="empty">${esc(T('Brak pól dla tego wyszukiwania.'))}</div>`}</div></details>`;
@@ -344,7 +491,9 @@ function paneData(p) {
   const dec = e => e.kind === 'opt' ? (d.a['r:' + e.k] || {}).n : (d.f[e.k] || {}).n;
   const all = p.fields.map(e => Object.assign({kind: 'std'}, e)).concat(p.adds.map(e => Object.assign({kind: 'opt'}, e)));
   const f = V.flt;
-  const list = all.filter(e => match(e, q) && (f === 'all' || (f === 'std' && e.kind === 'std') || (f === 'opt' && e.kind === 'opt') || (f === 'U' && !dec(e)) || (/^[YNQ]$/.test(f) && e.kind === 'std' && dec(e) === f)));
+  const tk = e => e.kind === 'opt' ? 'r:' + e.k : e.k, withT = all.filter(e => thr(tk(e)).length);
+  const list = all.filter(e => match(e, q) && (f === 'all' || (f === 'std' && e.kind === 'std') || (f === 'opt' && e.kind === 'opt') || (f === 'U' && !dec(e)) || (/^[YNQ]$/.test(f) && e.kind === 'std' && dec(e) === f) || (f === 'D' && thr(tk(e)).length > 0)));
+  const waitT = withT.some(e => thrState(thr(tk(e))).open);
   const legend = `<div class="legend"><span class="lg std">${ic('check')}<b>${esc(T('Standard PL'))}</b> ${esc(T('dane z pliku PECI dla Polski'))}</span><span class="lg opt">${ic('plus')}<b>${esc(T('Dane opcjonalne'))}</b> ${esc(T('dane z arkusza procesu w PECI_XML_Sections_fields.xlsm, których nie ma w standardzie'))}</span></div>`;
   const intro = `<div class="intro"><p>${esc(p.std ? T('Dla danych ze standardu PL zaznacz, czy Xpertis ich potrzebuje. Dla danych opcjonalnych – czy plik PECI dla Polski trzeba o nie uzupełnić.') : T('Ten proces nie ma pliku PECI dla Polski, więc nie ma standardu PL. Dla danych opcjonalnych zaznacz, czy plik PECI dla Polski trzeba o nie uzupełnić.'))}</p>
     ${s.und ? `<button type="button" class="btn sm" data-act="bulk" data-v="Y">${esc(T('Oznacz pozostałe ze standardu ({n}) jako potrzebne', {n: s.und}))}</button>` : ''}</div>`;
@@ -353,7 +502,7 @@ function paneData(p) {
     const und = std.filter(e => !dec(e)).length;
     const cnt = [std.length ? `<span class="tag std">${esc(T('Standard PL'))} ${std.length}</span>` : '', opt.length ? `<span class="tag addt">${esc(T('Dane opcjonalne'))} ${opt.length}</span>` : ''].join('');
     return `<section class="sec"><div class="sech"><h3>${esc(secName(g.s))} <code>${esc(g.s)}</code>${cnt}</h3><div class="bulk">${und ? `${esc(T('Standard bez decyzji: {n}', {n: und}))} <button type="button" class="btn sm" data-act="bulksec" data-s="${esc(g.s)}" data-v="Y">${esc(T('Wszystkie potrzebne'))}</button><button type="button" class="btn sm" data-act="bulksec" data-s="${esc(g.s)}" data-v="N">${esc(T('Wszystkie niepotrzebne'))}</button>` : ''}</div></div>${std.map(e => fieldRow(p, e)).join('')}${opt.map(e => addRow(p, e, 'r:' + e.k)).join('')}</section>`; }).join('');
-  return legend + intro + filterBar({all: all.length, std: s.n, opt: s.ref, U: s.und + s.refU, Y: s.Y, N: s.N, Q: s.Q}, [['all', 'Wszystkie'], ['std', 'Standard PL'], ['opt', 'Dane opcjonalne'], ['U', 'Bez decyzji'], ['Y', 'Potrzebne'], ['N', 'Niepotrzebne'], ['Q', 'Do wyjaśnienia']]) + (groups || `<div class="empty">${esc(T('Brak danych dla tego filtra.'))}</div>`) + dictBlock(p);
+  return legend + intro + filterBar({all: all.length, std: s.n, opt: s.ref, U: s.und + s.refU, Y: s.Y, N: s.N, Q: s.Q, D: withT.length}, [['all', 'Wszystkie'], ['std', 'Standard PL'], ['opt', 'Dane opcjonalne'], ['U', 'Bez decyzji'], ['Y', 'Potrzebne'], ['N', 'Niepotrzebne'], ['Q', 'Do wyjaśnienia']].concat(withT.length || f === 'D' ? [['D', 'Dyskusje', waitT ? 'thrf' : '']] : [])) + (groups || `<div class="empty">${esc(T('Brak danych dla tego filtra.'))}</div>`) + dictBlock(p);
 }
 function trRow(p, e, kind, key) {
   const d = pd(p.id), x = (kind === 'std' ? d.f[key] : d.a[key]) || {};
@@ -366,7 +515,7 @@ function trRow(p, e, kind, key) {
   return `<div class="row ${kind === 'std' ? 'k-std' : 'k-opt'}" data-k="${esc(key)}">
     <div class="fn"><div class="lb">${esc(fLabel(e))}</div><div class="px">${pathHtml(e)}</div>${kind === 'std' ? stdLine(e) : addLine(p, e)}</div>
     <div class="peci">${e.t ? `<b>${esc(tName(e.t))}</b> – ${esc(tNote(e.t))}` : `<span class="muted">${esc(T('typ ustal z zespołem Workday (brak wartości w przykładzie)'))}</span>`}<div class="ex" style="margin-top:4px">${vals(e)}</div></div>
-    ${btns}${trx}</div>`;
+    <div class="decw">${btns}${thrChip(p, key, x.n)}</div>${trx}${thrPanel(p, key, e, kind, x.n)}</div>`;
 }
 function paneTr(p) {
   const s = stats(p), d = pd(p.id), q = V.q.trim().toLowerCase();
@@ -394,8 +543,8 @@ function addRow(p, e, key, small) {
   return `<div class="row k-opt${small ? ' k-dict' : ''}${x.n === 'N' ? ' dim' : ''}" data-k="${esc(key)}">
     <div class="fn"><div class="lb">${esc(fLabel(e))}</div><div class="px">${pathHtml(e)}</div>${addLine(p, e)}${small ? '' : `<button type="button" class="lnk" data-act="more" data-k="${esc(key)}" aria-expanded="${!!open}">${esc(T(open ? 'Ukryj szczegóły' : 'Szczegóły'))}</button>`}</div>
     <div class="ex">${e.t ? `<span class="tag t">${esc(tName(e.t))}</span>` : ''}${vals(e)}${d ? `<span class="tag ${d.sc === 'Y' ? 'ref' : 'out'}">${esc(scopeTxt(d.sc))}</span>` : ''}${small && d && d.d ? `<span class="sm muted" style="flex-basis:100%"${d.d.length > 170 ? ` title="${esc(d.d)}"` : ''}>${esc(d.d.length > 170 ? d.d.slice(0, 165).replace(/\s+\S*$/, '') + '…' : d.d)}</span>` : ''}</div>
-    ${decBtns(key, x.n, ADD, ['ad', 'n', 'q'], 'add', small)}
-    ${open || (small && x.n) ? (small ? `<div class="more" style="grid-template-columns:minmax(0,1fr)"><div>${why}</div></div>` : moreHtml(e, why)) : ''}</div>`;
+    <div class="decw">${decBtns(key, x.n, ADD, ['ad', 'n', 'q'], 'add', small)}${thrChip(p, key, x.n)}</div>
+    ${open || (small && x.n) ? (small ? `<div class="more" style="grid-template-columns:minmax(0,1fr)"><div>${why}</div></div>` : moreHtml(e, why)) : ''}${thrPanel(p, key, e, 'opt', x.n)}</div>`;
 }
 function paneSum(p) {
   const s = stats(p), d = pd(p.id), c = d.c || {};
@@ -413,6 +562,7 @@ function paneSum(p) {
     ${c.done ? '' : `<button type="button" class="btn pri" data-act="done">${ic('check')}${esc(T('Zatwierdź analizę procesu'))}</button>`}`;
 }
 function renderProc(p) {
+  TI = {pid: p.id, map: thrIndex(p)};
   const pane = V.step === 1 ? paneData(p) : V.step === 2 ? paneTr(p) : paneSum(p);
   const idx = PROCS.indexOf(p), next = PROCS[idx + 1];
   const stepN = ['', 'Kompletność danych', 'Transformacja', 'Potwierdzenie'];
@@ -458,6 +608,7 @@ function renderModal() {
       <ol><li><b>${esc(T('Kompletność danych'))}</b> – ${esc(T('Standard PL (zielony): potrzebna, niepotrzebna albo do wyjaśnienia. Dane opcjonalne z xlsm (fioletowy): dodać do PECI PL czy nie.'))}</li><li><b>${esc(T('Transformacja'))}</b> – ${esc(T('Dla danych, które trafią do Xpertis: czy zmienić typ lub zapis i na jaki format Xpertis.'))}</li><li><b>${esc(T('Potwierdzenie'))}</b> – ${esc(T('Potwierdzenie kompletności, braki i zatwierdzenie procesu.'))}</li></ol>
       <h3>${esc(T('Standard i dane opcjonalne'))}</h3><p>${esc(T('Standard PL to dane z pliku PECI dla Polski przypisanego do procesu. Dane opcjonalne to pola z PECI_XML_Sections_fields.xlsm, których nie ma w standardzie: z arkusza procesu (numer arkusza = numer procesu) oraz – na zwiniętej liście na końcu kroku 1 – pozostałe pola z arkusza PECI Dictionary w sekcjach procesu. Procesy bez pliku PECI dla Polski mają tylko dane opcjonalne.'))}</p>
       <h3>${esc(T('Pasek u góry'))}</h3><p>${esc(T('Każda ikona to proces z numerem z PECI_XML_Sections_fields.xlsm. Kreska pod ikoną pokazuje postęp, zielona ikona – proces zatwierdzony, przerywana ramka – brak pliku PECI dla Polski.'))}</p>
+      <h3>${esc(T('Dyskusje przy danych'))}</h3><p>${esc(T('Pod przyciskami decyzji każdej danej jest przycisk dyskusji. Można dodać komentarz albo prośbę o decyzję skierowaną do zespołu (Xpertis, Chorus, Saint-Gobain). Prośbę zamyka pole „Rozwiązane” – zapisujemy, kto i kiedy ją rozwiązał, oraz krótkie ustalenie. Prośby czekające na zespoły widać na stronie Status, a wszystkie wpisy – w arkuszu „Discussions” raportu Excel.'))}</p>
       <h3>${esc(T('Zapisywanie'))}</h3><p>${SH.on ? esc(T('Decyzje zapisują się we wspólnej bazie i widzą je wszyscy użytkownicy; zmiany innych osób pojawiają się co kilkanaście sekund. Wskaźnik w nagłówku pokazuje stan synchronizacji. Plik JSON z menu „…” służy jako kopia zapasowa.')) : esc(T('Decyzje zapisują się automatycznie w tej przeglądarce. Aby przekazać je innym, użyj menu „…” → Zapisz ustalenia do pliku, a druga osoba – Wczytaj ustalenia z pliku. Raport Excel zbiera wszystkie decyzje.'))}</p>
       <h3>${esc(T('Źródła'))}</h3><p>${esc(T('Pliki PECI dla Polski z folderu „Sample PECI Files -Poland” oraz PECI_XML_Sections_fields.xlsm (lista procesów, przykłady danych, słownik pól). Dane osobowe w przykładach są zamaskowane.'))}</p></div>`;
   }
@@ -502,15 +653,20 @@ document.addEventListener('click', ev => {
     case 'file': openModal('file', t.dataset.f); break;
     case 'open': go('#p/' + t.dataset.p); break;
     case 'lflt': V.lflt = t.dataset.v; renderSide(); break;
-    case 'step': V.step = +t.dataset.v; V.q = ''; V.flt = 'all'; history.replaceState(null, '', '#p/' + p.id + '/' + V.step); render(); window.scrollTo(0, 0); break;
+    case 'step': V.step = +t.dataset.v; V.q = ''; V.flt = 'all'; V.thr = {}; history.replaceState(null, '', '#p/' + p.id + '/' + V.step); render(); window.scrollTo(0, 0); break;
     case 'flt': V.flt = t.dataset.v; rerenderKeep(); break;
     case 'more': V.open[t.dataset.k] = !V.open[t.dataset.k]; rerenderKeep(); break;
-    case 'need': setNeed(p, t.dataset.k, t.dataset.v); save(); rerenderKeep(); break;
+    case 'need': setNeed(p, t.dataset.k, t.dataset.v); save(); autoThread(p, t.dataset.k, (pd(p.id).f[t.dataset.k] || {}).n); rerenderKeep(); focusComposer(); break;
     case 'tr': { const store = t.dataset.kind === 'opt' ? pd(p.id).a : pd(p.id).f, k = t.dataset.k, x = store[k] || {};
       const e = t.dataset.kind === 'opt' ? (p.adds.find(z => 'r:' + z.k === k) || {}) : (field(p, k) || {});
       x.t = x.t === t.dataset.v ? '' : t.dataset.v; if (x.t === 'Y' && !x.fmt && SUGGEST[e.t]) { x.fmt = SUGGEST[e.t]; x.fmtTouched = false; }
       store[k] = stamp(x); save(); rerenderKeep(); break; }
-    case 'add': setAdd(p, t.dataset.k, t.dataset.v); save(); rerenderKeep(); break;
+    case 'add': setAdd(p, t.dataset.k, t.dataset.v); save(); autoThread(p, t.dataset.k, (pd(p.id).a[t.dataset.k] || {}).n); rerenderKeep(); focusComposer(); break;
+    case 'thr': { const mk = mkey(p.id, t.dataset.k); V.thr[mk] = !V.thr[mk]; if (V.thr[mk] && !thr(t.dataset.k).length) V.focusTh = mk; rerenderKeep(); focusComposer(); break; }
+    case 'madd': addMsg(p, t.dataset.k); break;
+    case 'gothr': openThread(+t.dataset.p, t.dataset.k); break;
+    case 'ib': V.ib = t.dataset.v; V.ibAll = false; rerenderKeep(); break;
+    case 'iball': V.ibAll = true; rerenderKeep(); break;
     case 'bulk': { const f = pd(p.id).f; let n = 0; p.fields.forEach(e => { if (!(f[e.k] && f[e.k].n)) { f[e.k] = stamp(Object.assign(f[e.k] || {}, {n: t.dataset.v})); n++; } }); save(); rerenderKeep(); toast(T('Oznaczono {n} danych.', {n})); break; }
     case 'bulksec': { const f = pd(p.id).f; let n = 0; p.fields.filter(e => e.s === t.dataset.s).forEach(e => { if (!(f[e.k] && f[e.k].n)) { f[e.k] = stamp(Object.assign(f[e.k] || {}, {n: t.dataset.v})); n++; } }); save(); rerenderKeep(); toast(T('Oznaczono {n} danych.', {n})); break; }
     case 'bulktr': { const dd = pd(p.id); let n = 0; [dd.f, dd.a].forEach(m => Object.keys(m).forEach(k => { const x = m[k]; if (x && x.n === 'Y' && !x.t) { x.t = 'N'; stamp(x); n++; } })); save(); rerenderKeep(); toast(T('Oznaczono {n} danych.', {n})); break; }
@@ -535,12 +691,17 @@ document.addEventListener('input', ev => {
   else if (act === 'why') { const a = pd(p.id).a; a[t.dataset.k] = stamp(Object.assign(a[t.dataset.k] || {}, {why: t.value})); save(); }
   else if (act === 'miss') { const c = pd(p.id).c; c.miss = t.value; stamp(c); save(); }
   else if (act === 'pnotes') { const c = pd(p.id).c; c.notes = t.value; stamp(c); save(); }
+  else if (act === 'mtext') { const c = cmpOf(p, t.dataset.k); c.tx = t.value; updComp(t, c); }
+  else if (act === 'mnote') { const x = pd(p.id).m[t.dataset.m]; if (x) { x.rn = t.value; x.ts = now(); save(); } }
 });
 document.addEventListener('change', ev => {
   const t = ev.target, act = t.dataset && t.dataset.act, p = V.p != null ? PBY[V.p] : null;
   if (act === 'fmt') { const m = t.dataset.kind === 'opt' ? pd(p.id).a : pd(p.id).f; m[t.dataset.k] = stamp(Object.assign(m[t.dataset.k] || {}, {fmt: t.value, fmtTouched: true})); save(); rerenderKeep(); }
   else if (act === 'dscope') { V.dscope = t.checked; V.dictOpen = true; rerenderKeep(); }
   else if (act === 'jump') go(t.value === 'start' ? '#start' : '#p/' + t.value);
+  else if (act === 'mres') resMsg(p, t.dataset.m, t.checked);
+  else if (act === 'mkind') { const c = cmpOf(p, t.dataset.k); c.ty = t.value === 'q' ? 'q' : 'c'; if (c.ty === 'c') c.to = ''; rerenderKeep(); }
+  else if (act === 'mteam') { const c = cmpOf(p, t.dataset.k); c.to = t.value; updComp(t, c); }
   else if (act === 'q' || act === 'dq') { /* już obsłużone */ }
 });
 document.addEventListener('toggle', ev => { if (ev.target.dataset && ev.target.dataset.act === 'dict') V.dictOpen = ev.target.open; }, true);
@@ -562,6 +723,9 @@ document.addEventListener('submit', async ev => {
     catch (e) { b.disabled = false; $('#who-err').textContent = e.auth ? T('Nieprawidłowe hasło zespołu.') : T('Brak połączenia z serwerem. Spróbuj ponownie.'); f.key.select(); return; }
   }
   V.modal = null; renderModal(); render(); toast(first ? T('Witaj, {n}!', {n: name}) : T('Zapisano: {w}', {w: S.who}));
+});
+document.addEventListener('keydown', ev => {
+  if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey) && ev.target.dataset && ev.target.dataset.act === 'mtext') { ev.preventDefault(); addMsg(V.p != null ? PBY[V.p] : null, ev.target.dataset.k); }
 });
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape') { if (V.modal) closeModal(); else if (V.menu) { V.menu = false; renderTop(); } } });
 window.addEventListener('hashchange', route);
@@ -597,7 +761,7 @@ function importJson(text) {
   if (!o || o.app !== APP || !o.d) { toast(T('To nie jest plik ustaleń tego narzędzia.')); return; }
   let n = 0;
   Object.keys(o.d).forEach(pid => { if (!PBY[pid]) return; const src = o.d[pid], dst = pd(pid);
-    ['f', 'a'].forEach(kind => Object.keys(src[kind] || {}).forEach(k => { if (newer(dst[kind][k], src[kind][k])) { dst[kind][k] = src[kind][k]; n++; } }));
+    ['f', 'a', 'm'].forEach(kind => Object.keys(src[kind] || {}).forEach(k => { if (newer(dst[kind][k], src[kind][k])) { dst[kind][k] = src[kind][k]; n++; } }));
     if (src.c && newer(dst.c && dst.c.ts ? dst.c : null, src.c)) { dst.c = src.c; n++; } });
   save(); render(); toast(T('Wczytano ustalenia{by}. Zaktualizowane wpisy: {n}.', {by: o.by ? ' – ' + o.by : '', n}));
 }
@@ -703,9 +867,79 @@ async function exportWorkday() {
       if (ci === C['Response / resolution'] && !pr) fl = 'FFF7FAFE';
       if (fl) c.fill = fill(fl); }); });
   ws.autoFilter = {from: {row: HR, column: 1}, to: {row: HR + Math.max(rows.length, 1), column: NC}};
+  addDiscussionSheet(wb);
   const buf = await wb.xlsx.writeBuffer();
   download(`PECI_data_analysis_report_${ymd()}.xlsx`, new Blob([buf], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
   toast(rows.length ? T('Pobrano PECI data analysis report ({n} pozycji).', {n: items.length}) : T('Pobrano PECI data analysis report – na razie bez pozycji.'));
+}
+
+/* ---------- raport Excel: arkusz Discussions (EN) – wątki przy danych, wpisy chronologicznie ---------- */
+function discussionThreads() {
+  const L0 = LANG; LANG = 'en';
+  try {
+    const out = [];
+    const decTxt = (kind, x) => (kind === 'std' ? {Y: 'Needed', N: 'Not needed', Q: 'To clarify'} : {Y: 'Add to PL PECI', N: 'Do not add', Q: 'To clarify'})[x && x.n] || 'Not reviewed';
+    const xml = e => e.k && !/^d:/.test(e.k) ? e.k : [e.s, e.u, e.f].filter(Boolean).join('/');
+    PROCS.forEach(p => { const d = S.d[p.id]; if (!d || !d.m || !Object.keys(d.m).length) return; const idx = thrIndex(p);
+      const order = p.fields.map(e => [e.k, 'PL standard', e, 'std']).concat(p.adds.map(e => ['r:' + e.k, 'Optional (xlsm sheet ' + p.id + ')', e, 'opt']), dictItems(p).map(e => [e.k, 'Optional (PECI Dictionary)', e, 'opt']));
+      const seen = new Set();
+      order.forEach(([key, origin, e, kind]) => { const ms = idx[key]; if (!ms || !ms.length) return; seen.add(key);
+        out.push({proc: p.id + ' · ' + pName(p), origin, field: e.f, path: xml(e), decision: decTxt(kind, kind === 'std' ? d.f[key] : d.a[key]), ms}); });
+      Object.keys(idx).filter(k => !seen.has(k)).forEach(k => out.push({proc: p.id + ' · ' + pName(p), origin: '–', field: k, path: k, decision: '–', ms: idx[k]})); });
+    return out;
+  } finally { LANG = L0; }
+}
+function addDiscussionSheet(wb) {
+  const th = discussionThreads();
+  const G = [['Data item', 'FF17232E', [['#', 8], ['Process', 26], ['Data origin', 22], ['PECI field', 30], ['XML path', 44], ['Decision', 14]]],
+    ['Entry (chronological)', 'FF3A4855', [['No.', 5], ['Date & time', 19], ['Author', 14], ['Author team', 13], ['Entry type', 16], ['For team', 13], ['Message', 64]]],
+    ['Decision request', 'FF9A600C', [['Status', 11], ['Resolved by', 24], ['Resolved on', 19], ['Resolution', 44]]]];
+  const cols = [].concat(...G.map(g => g[2])), NC = cols.length, HR = 5;
+  const A = {name: 'Arial', size: 10}, ink = 'FF17232E', grey = 'FF8D98A4', line = {style: 'thin', color: {argb: 'FFD9DFE5'}};
+  const fill = argb => ({type: 'pattern', pattern: 'solid', fgColor: {argb}});
+  const SF = {Waiting: 'FFFAEED7', Resolved: 'FFE1F2E8'}, SC = {Waiting: 'FF9A600C', Resolved: 'FF1B7446'};
+  const fdtEn = iso => iso ? new Date(iso).toLocaleString('en-GB', {day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'}) : '';
+  const ws = wb.addWorksheet('Discussions', {views: [{state: 'frozen', ySplit: HR, xSplit: 2, showGridLines: false, zoomScale: 90}],
+    pageSetup: {orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9, printTitlesRow: '4:5', margins: {left: .4, right: .4, top: .5, bottom: .5, header: .3, footer: .3}},
+    headerFooter: {oddFooter: '&LDiscussions – PECI data analysis report&RPage &P of &N'}});
+  ws.columns = cols.map(c => ({width: c[1]}));
+  ws.getCell(1, 1).value = 'Discussions – comments and decision requests'; ws.getCell(1, 1).font = Object.assign({}, A, {size: 16, bold: true, color: {argb: ink}}); ws.getRow(1).height = 26;
+  ws.getCell(2, 1).value = `Workday → Xpertis integration (Poland) · Generated ${new Date().toLocaleString('en-GB', {dateStyle: 'medium', timeStyle: 'short'})} · Prepared by ${S.who || '–'} · Messages are in the author's language`;
+  ws.getCell(2, 1).font = Object.assign({}, A, {color: {argb: 'FF66727F'}});
+  const first = new Set(); let c0 = 1;
+  G.forEach(([name, col, cs]) => { const c1 = c0 + cs.length - 1; first.add(c0); if (c1 > c0) ws.mergeCells(4, c0, 4, c1);
+    const cell = ws.getCell(4, c0); cell.value = name; for (let i = c0; i <= c1; i++) ws.getCell(4, i).fill = fill(col);
+    cell.font = Object.assign({}, A, {bold: true, color: {argb: 'FFFFFFFF'}}); cell.alignment = {vertical: 'middle', horizontal: 'left', indent: 1};
+    for (let i = c0; i <= c1; i++) { const h = ws.getCell(HR, i); h.value = cols[i - 1][0]; h.font = Object.assign({}, A, {bold: true, color: {argb: ink}}); h.fill = fill('FFEEF1F4');
+      h.alignment = {vertical: 'middle', wrapText: true}; h.border = {bottom: {style: 'medium', color: {argb: col}}, left: i === c0 ? {style: 'thin', color: {argb: 'FFC2CBD4'}} : undefined}; }
+    c0 = c1 + 1; });
+  ws.getRow(4).height = 20; ws.getRow(HR).height = 30;
+  let r = HR + 1;
+  if (!th.length) { const c = ws.getCell(r, 1); c.value = 'No discussions yet.'; c.font = Object.assign({}, A, {italic: true}); r++; }
+  const style = (row, head, status, req) => row.eachCell({includeEmpty: true}, (c, ci) => {
+    const f = Object.assign({}, A);
+    if (head) f.bold = true; else if (ci <= 6) f.color = {argb: grey};
+    if ((ci === 4 || ci === 5) && (head || ci === 4)) f.name = 'Consolas';
+    if (ci === 11 && req) f.bold = true;
+    if (ci === 14 && SC[status]) { f.bold = true; f.color = {argb: SC[status]}; }
+    c.font = f; c.alignment = {vertical: 'top', wrapText: true, horizontal: ci === 1 || ci === 7 ? 'left' : undefined};
+    c.border = Object.assign(head ? {top: {style: 'thin', color: {argb: grey}}} : {}, {bottom: line}, first.has(ci) ? {left: {style: 'thin', color: {argb: 'FFC2CBD4'}}} : {});
+    if (head) c.fill = fill('FFF4F6F8');
+    if (ci === 14 && SF[status]) c.fill = fill(SF[status]); });
+  th.forEach((t, ti) => {
+    const reqs = t.ms.filter(m => m.ty === 'q'), open = reqs.filter(m => !m.done), teams = open.map(m => m.to).filter((x, i, a) => x && a.indexOf(x) === i);
+    const status = open.length ? 'Waiting' : reqs.length ? 'Resolved' : '–';
+    const sum = [t.ms.length + (t.ms.length === 1 ? ' entry' : ' entries'), reqs.length ? reqs.length + (reqs.length === 1 ? ' decision request' : ' decision requests') : 'comments only',
+      reqs.length ? (open.length ? (reqs.length > open.length ? (reqs.length - open.length) + ' resolved, ' : '') + open.length + ' waiting for ' + teams.join(', ') : 'all resolved') : ''].filter(Boolean).join(' · ');
+    const hr = ws.getRow(r);
+    hr.values = ['T' + (ti + 1), t.proc, t.origin, t.field, t.path, t.decision, t.ms.length, sum, '', '', '', '', '', status, '', '', ''];
+    ws.mergeCells(r, 8, r, 13); style(hr, true, status, false); r++;
+    t.ms.forEach((m, i) => { const q = m.ty === 'q', st = q ? (m.done ? 'Resolved' : 'Waiting') : '–';
+      const row = ws.getRow(r);
+      row.values = ['T' + (ti + 1) + '.' + (i + 1), t.proc, t.origin, t.field, t.path, t.decision, i + 1, fdtEn(m.at), m.nm || String(m.by || '').split(' · ')[0], m.tm || '', q ? 'Decision request' : 'Comment', q ? (m.to || '') : '', m.tx || '',
+        st, q && m.done ? (m.rby || '') : '', q && m.done ? fdtEn(m.rat) : '', q && m.done ? (m.rn || '') : ''];
+      style(row, false, st, q); r++; }); });
+  ws.autoFilter = {from: {row: HR, column: 1}, to: {row: Math.max(r - 1, HR + 1), column: NC}};
 }
 
 route();

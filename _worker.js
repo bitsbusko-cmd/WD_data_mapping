@@ -6,8 +6,9 @@
 //   POLICY_AUD  – Application Audience (AUD) Tag aplikacji Access
 //   TEAM_KEY    – (zamiast Access) hasło zespołu, co najmniej 10 znaków, jako sekret
 
-const FIELDS = ['n', 't', 'fmt', 'det', 'note', 'why', 'fmtTouched', 'ts', 'by', 'ok', 'miss', 'notes', 'done'];
-const ID_RE = /^\d{1,3}\|[fac]\|.{0,400}$/u;
+const FIELDS = ['n', 't', 'fmt', 'det', 'note', 'why', 'fmtTouched', 'ts', 'by', 'ok', 'miss', 'notes', 'done',
+  'k', 'ty', 'to', 'tx', 'nm', 'tm', 'at', 'rby', 'rat', 'rn']; // ostatnie: wpisy dyskusji przy danych
+const ID_RE = /^\d{1,3}\|[facm]\|.{0,400}$/u;
 let ready = false, jwks = null, jwksAt = 0;
 
 const json = (status, body) => new Response(JSON.stringify(body), {
