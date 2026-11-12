@@ -425,7 +425,7 @@ function inboxCard() {
   PROCS.forEach(p => { const d = S.d[p.id]; if (!d || !d.m) return; const idx = thrIndex(p);
     Object.keys(idx).forEach(key => { const e = itemOf(p, key); if (!e) return; idx[key].forEach(m => { if (m.ty === 'q') all.push({p, key, e, m, n: idx[key].length}); }); }); });
   const head = (sub, seg) => `<div class="ibh"><h2 id="ib-h">${ic('flag')}${esc(T('Prośby o decyzję'))}${sub ? ` <span class="sub">${esc(sub)}</span>` : ''}</h2>${seg || ''}</div>`;
-  if (!all.length) return `<section class="inbox" aria-labelledby="ib-h">${head('')}<p class="ib-empty">${esc(T('Brak próśb o decyzję. Prośbę wyślesz przy danej oznaczonej „Do wyjaśnienia” – przycisk pod decyzją w kroku 1.'))}</p></section>`;
+  if (!all.length) return `<section class="inbox" aria-labelledby="ib-h">${head('')}<p class="ib-empty">${esc(T('Brak próśb o decyzję.'))}</p></section>`;
   const open = all.filter(x => !x.m.done).sort((a, b) => (a.m.since || '').localeCompare(b.m.since || ''));
   const solved = all.filter(x => x.m.done).sort((a, b) => (b.m.rat || '').localeCompare(a.m.rat || ''));
   const mine = open.filter(x => x.m.to === S.team);
