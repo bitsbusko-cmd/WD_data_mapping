@@ -456,3 +456,7 @@ table.fx tr.c td.p{color:var(--tr);font-weight:600}
 .evt span{min-width:0;overflow-wrap:anywhere}
 .iq .by .ic{width:13px;height:13px;color:var(--ask)}
 @media (max-width:860px){.th-list .evt{padding-left:0}}
+/* rodzaj wpisu zależny od decyzji */
+.th-comp .as .kd{display:inline-flex;align-items:center;gap:5px;font-weight:700;color:var(--ink2)}
+.th-comp .as .kd.q{color:var(--ask)}
+.chint{margin:8px 0 0;font-size:.8rem;color:var(--muted)}

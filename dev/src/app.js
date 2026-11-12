@@ -295,6 +295,8 @@ function reqHist(m, ev) {
   m.rby = done ? last.by : ''; m.rat = done ? last.at : ''; m.rn = done ? (last.rn || '') : '';
   m.since = last && last.ev === 'reo' ? last.at : m.at;
 }
+const decOf = (p, key) => { const d = S.d[p.id], x = d ? (/^[rd]:/.test(key) ? d.a[key] : d.f[key]) : null; return (x && x.n) || ''; };
+const fdtEn = iso => iso ? new Date(iso).toLocaleString('en-GB', {day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'}) : '';
 const evWho = x => (x.nm || String(x.by || '').split(' · ')[0] || '?') + (x.tm ? ' (' + x.tm + ')' : '');
 function evtHtml(x, multi) {
   const r = x.req, res = x.ev === 'res', old = res && x.rn && !(r.cur && r.cur.id === x.id);
@@ -313,7 +315,7 @@ function thrChip(p, key, dec) {
   const ms = thr(key), mk = mkey(p.id, key), open = !!V.thr[mk];
   const a = `data-act="thr" data-k="${esc(key)}" aria-expanded="${open}"${open ? ` aria-controls="th-${safeId(mk)}"` : ''}`;
   if (!ms.length) return dec === 'Q'
-    ? `<button type="button" class="thr s-new" ${a}>${ic('plus')}<span>${esc(T('Zadaj pytanie'))}</span></button>`
+    ? `<button type="button" class="thr s-new" ${a}>${ic('plus')}<span>${esc(T('Prośba o decyzję'))}</span></button>`
     : `<button type="button" class="thr s-ghost" ${a}>${ic('plus')}<span>${esc(T('Komentarz'))}</span></button>`;
   const st = thrState(ms);
   return `<button type="button" class="thr ${st.cls}" ${a} title="${esc(T('Dyskusja przy danej'))}">${ic('chat')}<span class="n">${ms.length}</span><span>${esc(st.label)}</span>${ic('down', 'chev')}</button>`;
@@ -337,26 +339,27 @@ function msgHtml(key, m) {
 function thrPanel(p, key, e, kind, dec) {
   const mk = mkey(p.id, key); if (!V.thr[mk]) return '';
   const ms = thr(key), st = thrState(ms), sid = safeId(mk);
-  const c = V.cmp[mk] || (V.cmp[mk] = {tx: '', ty: dec === 'Q' && !st.open ? 'q' : 'c', to: ''});
-  const can = !!c.tx.trim() && (c.ty === 'c' || !!c.to);
+  const ty = dec === 'Q' ? 'q' : 'c', q = ty === 'q', c = V.cmp[mk] || (V.cmp[mk] = {tx: '', ty, to: ''});
+  c.ty = ty; if (!q) c.to = '';
+  const can = !!c.tx.trim() && (!q || !!c.to);
   const info = ms.length ? plural(ms.length, F_WPIS) + (st.reqs ? ' · ' + plural(st.reqs, F_PROS) : '') : T('brak wpisów');
   const head = `<div class="th-head"><div class="th-title">${ic('chat')}<b>${esc(T('Dyskusja'))}</b><span>${esc(info)}</span></div>
     <div class="th-pills">${st.open ? `<span class="pill wait">${ic('clock')}${esc(T('Czeka na: {t}', {t: st.teams.join(', ')}))}</span>` : ''}${st.solved ? `<span class="pill done">${ic('check')}${esc(plural(st.solved, F_ROZ))}</span>` : ''}<button type="button" class="btn ghost icon sm" data-act="thr" data-k="${esc(key)}" aria-label="${esc(T('Zwiń dyskusję'))}" title="${esc(T('Zwiń dyskusję'))}">${ic('x')}</button></div></div>`;
   const multi = st.reqs > 1;
-  const list = ms.length ? `<ol class="th-list">${timeline(ms).map(m => m.ev ? evtHtml(m, multi) : msgHtml(key, m)).join('')}</ol>` : `<p class="th-empty">${esc(T('Brak wpisów. Zadaj pytanie albo dodaj komentarz – zobaczą go wszyscy użytkownicy.'))}</p>`;
+  const list = ms.length ? `<ol class="th-list">${timeline(ms).map(m => m.ev ? evtHtml(m, multi) : msgHtml(key, m)).join('')}</ol>` : `<p class="th-empty">${esc(T(q ? 'Brak próśb o decyzję. Opisz, czego dotyczy decyzja, i wybierz zespół – zobaczą to wszyscy użytkownicy.' : 'Brak komentarzy. Komentarz zobaczą wszyscy użytkownicy.'))}</p>`;
   const map = kind === 'std' ? DEC : ADD, act = kind === 'std' ? 'need' : 'add';
   const short = st.reqs && !st.open && dec === 'Q' && V.step === 1 ? `<div class="th-done">${ic('check')}<span>${esc(T('Wszystkie prośby rozwiązane. Ustaw decyzję dla danej:'))}</span><span class="dec" role="group" aria-label="${esc(T('Decyzja'))}"><button type="button" class="${kind === 'std' ? 'y' : 'ad'}" data-act="${act}" data-k="${esc(key)}" data-v="Y" aria-pressed="false">${esc(T(map.Y))}</button><button type="button" class="n" data-act="${act}" data-k="${esc(key)}" data-v="N" aria-pressed="false">${esc(T(map.N))}</button></span></div>` : '';
-  const comp = `<div class="th-comp">${known() ? `<p class="as">${ic('user')}${esc(T('Piszesz jako'))} <b>${esc(S.who)}</b></p>` : ''}
-    <label class="sr" for="mt-${sid}">${esc(T('Treść wpisu'))}</label>
-    <textarea class="inp" id="mt-${sid}" data-act="mtext" data-k="${esc(key)}" rows="2" maxlength="5000" placeholder="${esc(T('Napisz komentarz albo pytanie do zespołu…'))}">${esc(c.tx)}</textarea>
+  const comp = `<div class="th-comp"><p class="as"><span class="kd ${ty}">${ic(q ? 'flag' : 'chat')}${esc(T(q ? 'Prośba o decyzję' : 'Komentarz'))}</span>${known() ? `<span>· ${esc(T('Piszesz jako'))} <b>${esc(S.who)}</b></span>` : ''}</p>
+    <label class="sr" for="mt-${sid}">${esc(T(q ? 'Treść prośby o decyzję' : 'Treść komentarza'))}</label>
+    <textarea class="inp" id="mt-${sid}" data-act="mtext" data-k="${esc(key)}" rows="2" maxlength="5000" placeholder="${esc(T(q ? 'Opisz, o jaką decyzję prosisz…' : 'Napisz komentarz…'))}">${esc(c.tx)}</textarea>
     <div class="cbar">
-      <label class="fld" for="mk-${sid}">${esc(T('Rodzaj wpisu'))}<select class="inp" id="mk-${sid}" data-act="mkind" data-k="${esc(key)}"><option value="c"${c.ty === 'c' ? ' selected' : ''}>${esc(T('Komentarz'))}</option><option value="q"${c.ty === 'q' ? ' selected' : ''}>${esc(T('Prośba o decyzję'))}</option></select></label>
-      ${c.ty === 'q' ? `<label class="fld" for="mo-${sid}">${esc(T('Kto ma zdecydować?'))}<select class="inp" id="mo-${sid}" data-act="mteam" data-k="${esc(key)}"><option value="">${esc(T('Wybierz zespół'))}</option>${TEAMS.map(t => `<option value="${esc(t)}"${c.to === t ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>` : ''}
+      ${q ? `<label class="fld" for="mo-${sid}">${esc(T('Kto ma zdecydować?'))}<select class="inp" id="mo-${sid}" data-act="mteam" data-k="${esc(key)}"><option value="">${esc(T('Wybierz zespół'))}</option>${TEAMS.map(t => `<option value="${esc(t)}"${c.to === t ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>` : ''}
       <span class="grow"></span>
       <span class="hint" aria-hidden="true"><span class="kbd">Ctrl</span>+<span class="kbd">Enter</span></span>
-      <button type="button" class="btn pri" data-act="madd" data-k="${esc(key)}"${can ? '' : ' disabled'}>${ic('plus')}${esc(T('Dodaj wpis'))}</button>
+      <button type="button" class="btn pri" data-act="madd" data-k="${esc(key)}"${can ? '' : ' disabled'}>${ic(q ? 'flag' : 'plus')}${esc(T(q ? 'Wyślij prośbę' : 'Dodaj komentarz'))}</button>
     </div>
-    <p class="warnline"${c.ty === 'q' && !c.to && c.tx.trim() ? '' : ' hidden'}>${esc(T('Wybierz zespół, który ma podjąć decyzję.'))}</p></div>`;
+    <p class="warnline"${q && !c.to && c.tx.trim() ? '' : ' hidden'}>${esc(T('Wybierz zespół, który ma podjąć decyzję.'))}</p>
+    <p class="chint">${esc(T(q ? 'Prośba trafi do wybranego zespołu i do raportu Excel (arkusz „Decisions”).' : 'Komentarz trafi do raportu Excel (arkusz „PECI data analysis”). Prośbę o decyzję wyślesz po wybraniu „Do wyjaśnienia”.'))}</p></div>`;
   return `<div class="thread" id="th-${sid}" role="region" aria-label="${esc(T('Dyskusja: {f}', {f: fLabel(e)}))}">${head}${list}${short}${comp}</div>`;
 }
 const cmpOf = (p, key) => { const mk = mkey(p.id, key); return V.cmp[mk] || (V.cmp[mk] = {tx: '', ty: 'c', to: ''}); };
@@ -371,18 +374,18 @@ function focusComposer() {
   el.focus({preventScroll: true}); const r = el.getBoundingClientRect(); if (r.bottom > innerHeight - 8 || r.top < 150) el.scrollIntoView({block: 'center'});
 }
 function autoThread(p, key, n) {
-  if (n !== 'Q') return; const mk = mkey(p.id, key), st = thrState(thr(key));
-  V.thr[mk] = true; if (!V.cmp[mk] || !V.cmp[mk].tx) V.cmp[mk] = {tx: '', ty: st.open ? 'c' : 'q', to: ''}; V.focusTh = mk;
+  if (n !== 'Q') return; const mk = mkey(p.id, key);
+  V.thr[mk] = true; if (!V.cmp[mk]) V.cmp[mk] = {tx: '', ty: 'q', to: ''}; V.focusTh = mk;
 }
 function addMsg(p, key) {
   if (!p) return; const mk = mkey(p.id, key), c = V.cmp[mk]; if (!c) return;
-  const tx = c.tx.trim(); if (!tx || (c.ty === 'q' && !c.to)) return;
+  const ty = decOf(p, key) === 'Q' ? 'q' : 'c', tx = c.tx.trim(); if (!tx || (ty === 'q' && !c.to)) return;
   if (!known()) { openModal('who'); return; }
   const t = now();
-  pd(p.id).m[newId()] = {k: key, ty: c.ty, to: c.ty === 'q' ? c.to : '', tx: tx.slice(0, 5000), nm: S.name, tm: S.team, by: S.who, at: t, ts: t};
-  V.cmp[mk] = {tx: '', ty: 'c', to: ''}; V.thr[mk] = true; V.focusTh = mk;
+  pd(p.id).m[newId()] = {k: key, ty, to: ty === 'q' ? c.to : '', tx: tx.slice(0, 5000), nm: S.name, tm: S.team, by: S.who, at: t, ts: t};
+  V.cmp[mk] = {tx: '', ty, to: ''}; V.thr[mk] = true; V.focusTh = mk;
   save(); rerenderKeep(); focusComposer();
-  if (c.ty === 'q') toast(T('Dodano prośbę o decyzję do zespołu {t}.', {t: c.to}));
+  if (ty === 'q') toast(T('Dodano prośbę o decyzję do zespołu {t}.', {t: c.to}));
 }
 const reqOf = (p, id) => { const x = pd(p.id).m[id]; return x ? (thrIndex(p)[x.k] || []).find(m => m.id === id) || null : null; };
 function evAdd(p, req, o) { const t = now(); pd(p.id).m[newId()] = Object.assign({k: req.k, ty: 'e', ref: req.id, ts: t}, o); }
@@ -422,7 +425,7 @@ function inboxCard() {
   PROCS.forEach(p => { const d = S.d[p.id]; if (!d || !d.m) return; const idx = thrIndex(p);
     Object.keys(idx).forEach(key => { const e = itemOf(p, key); if (!e) return; idx[key].forEach(m => { if (m.ty === 'q') all.push({p, key, e, m, n: idx[key].length}); }); }); });
   const head = (sub, seg) => `<div class="ibh"><h2 id="ib-h">${ic('flag')}${esc(T('Prośby o decyzję'))}${sub ? ` <span class="sub">${esc(sub)}</span>` : ''}</h2>${seg || ''}</div>`;
-  if (!all.length) return `<section class="inbox" aria-labelledby="ib-h">${head('')}<p class="ib-empty">${esc(T('Brak próśb o decyzję. Prośbę dodasz w dyskusji przy danej – przycisk pod decyzją w kroku 1.'))}</p></section>`;
+  if (!all.length) return `<section class="inbox" aria-labelledby="ib-h">${head('')}<p class="ib-empty">${esc(T('Brak próśb o decyzję. Prośbę wyślesz przy danej oznaczonej „Do wyjaśnienia” – przycisk pod decyzją w kroku 1.'))}</p></section>`;
   const open = all.filter(x => !x.m.done).sort((a, b) => (a.m.since || '').localeCompare(b.m.since || ''));
   const solved = all.filter(x => x.m.done).sort((a, b) => (b.m.rat || '').localeCompare(a.m.rat || ''));
   const mine = open.filter(x => x.m.to === S.team);
@@ -644,7 +647,7 @@ function renderModal() {
       <ol><li><b>${esc(T('Kompletność danych'))}</b> – ${esc(T('Standard PL (zielony): potrzebna, niepotrzebna albo do wyjaśnienia. Dane opcjonalne z xlsm (fioletowy): dodać do PECI PL czy nie.'))}</li><li><b>${esc(T('Transformacja'))}</b> – ${esc(T('Dla danych, które trafią do Xpertis: czy zmienić typ lub zapis i na jaki format Xpertis.'))}</li><li><b>${esc(T('Potwierdzenie'))}</b> – ${esc(T('Potwierdzenie kompletności, braki i zatwierdzenie procesu.'))}</li></ol>
       <h3>${esc(T('Standard i dane opcjonalne'))}</h3><p>${esc(T('Standard PL to dane z pliku PECI dla Polski przypisanego do procesu. Dane opcjonalne to pola z PECI_XML_Sections_fields.xlsm, których nie ma w standardzie: z arkusza procesu (numer arkusza = numer procesu) oraz – na zwiniętej liście na końcu kroku 1 – pozostałe pola z arkusza PECI Dictionary w sekcjach procesu. Procesy bez pliku PECI dla Polski mają tylko dane opcjonalne.'))}</p>
       <h3>${esc(T('Pasek u góry'))}</h3><p>${esc(T('Każda ikona to proces z numerem z PECI_XML_Sections_fields.xlsm. Kreska pod ikoną pokazuje postęp, zielona ikona – proces zatwierdzony, przerywana ramka – brak pliku PECI dla Polski.'))}</p>
-      <h3>${esc(T('Dyskusje przy danych'))}</h3><p>${esc(T('Pod przyciskami decyzji każdej danej jest przycisk dyskusji. Można dodać komentarz albo prośbę o decyzję skierowaną do zespołu (Xpertis, Chorus, Saint-Gobain). Prośbę zamyka pole „Rozwiązane” – zapisujemy, kto i kiedy ją rozwiązał, oraz krótkie ustalenie; każde rozwiązanie i ponowne otwarcie zostaje w historii wątku. Prośby czekające na zespoły widać na stronie Status, a wszystkie wpisy – w arkuszu „Discussions” raportu Excel.'))}</p>
+      <h3>${esc(T('Dyskusje przy danych'))}</h3><p>${esc(T('Pod przyciskami decyzji każdej danej jest przycisk dyskusji. Przy danej potrzebnej, niepotrzebnej albo jeszcze bez decyzji dodajesz komentarz – trafi do arkusza „PECI data analysis” raportu Excel. Przy danej do wyjaśnienia wysyłasz prośbę o decyzję do wybranego zespołu (Xpertis, Chorus, Saint-Gobain). Prośbę zamyka pole „Rozwiązane” – zapisujemy, kto i kiedy ją rozwiązał, oraz krótkie ustalenie; każde rozwiązanie i ponowne otwarcie zostaje w historii. Prośby czekające na zespoły widać na stronie Status, a w raporcie – w arkuszu „Decisions”.'))}</p>
       <h3>${esc(T('Zapisywanie'))}</h3><p>${SH.on ? esc(T('Decyzje zapisują się we wspólnej bazie i widzą je wszyscy użytkownicy; zmiany innych osób pojawiają się co kilkanaście sekund. Wskaźnik w nagłówku pokazuje stan synchronizacji. Plik JSON z menu „…” służy jako kopia zapasowa.')) : esc(T('Decyzje zapisują się automatycznie w tej przeglądarce. Aby przekazać je innym, użyj menu „…” → Zapisz ustalenia do pliku, a druga osoba – Wczytaj ustalenia z pliku. Raport Excel zbiera wszystkie decyzje.'))}</p>
       <h3>${esc(T('Źródła'))}</h3><p>${esc(T('Pliki PECI dla Polski z folderu „Sample PECI Files -Poland” oraz PECI_XML_Sections_fields.xlsm (lista procesów, przykłady danych, słownik pól). Dane osobowe w przykładach są zamaskowane.'))}</p></div>`;
   }
@@ -736,7 +739,6 @@ document.addEventListener('change', ev => {
   else if (act === 'dscope') { V.dscope = t.checked; V.dictOpen = true; rerenderKeep(); }
   else if (act === 'jump') go(t.value === 'start' ? '#start' : '#p/' + t.value);
   else if (act === 'mres') resMsg(p, t.dataset.m, t.checked);
-  else if (act === 'mkind') { const c = cmpOf(p, t.dataset.k); c.ty = t.value === 'q' ? 'q' : 'c'; if (c.ty === 'c') c.to = ''; rerenderKeep(); }
   else if (act === 'mteam') { const c = cmpOf(p, t.dataset.k); c.to = t.value; updComp(t, c); }
   else if (act === 'q' || act === 'dq') { /* już obsłużone */ }
 });
@@ -810,7 +812,8 @@ function loadExcelJS() {
 }
 
 /* ---------- PECI data analysis report (EN, jeden arkusz) – wszystkie ustalenia z analizy ---------- */
-function workdayRows() {
+function workdayRows(tmap) {
+  tmap = tmap || {};
   const L0 = LANG; LANG = 'en';
   try {
     const out = [];
@@ -821,9 +824,13 @@ function workdayRows() {
     const fmt = x => x.t === 'Y' && x.fmt ? T(FMTBY[x.fmt]) : '';
     const det = x => x.t === 'Y' ? (x.det || '') : '';
     const STD = {Y: ['Yes – needed', 'None – already in PL PECI', 'Y'], N: ['No – not needed', 'None – not used by Xpertis', 'N'], Q: ['To clarify', 'Answer question', 'Q'], '': ['Not reviewed yet', 'Pending Xpertis review', '']};
-    const OPT = {Y: ['Yes – add to PL PECI', 'Add field to PL PECI output', 'A'], N: ['No – do not add', 'None', 'N'], Q: ['To clarify', 'Answer question', 'Q']};
+    const OPT = {Y: ['Yes – add to PL PECI', 'Add field to PL PECI output', 'A'], N: ['No – do not add', 'None', 'N'], Q: ['To clarify', 'Answer question', 'Q'], '': ['Not reviewed yet', 'Pending Xpertis review', '']};
     PROCS.forEach(p => { const d = S.d[p.id]; if (!d) return;
-      const c = d.c || {}, any = Object.keys(d.f || {}).some(k => d.f[k].n) || Object.keys(d.a || {}).some(k => d.a[k].n) || c.ok || c.miss || c.notes || c.done;
+      const idx = thrIndex(p), withMsg = key => !!(idx[key] && idx[key].length);
+      // komentarz do danej: uwagi z pola „Uwagi” + komentarze z dyskusji (chronologicznie) + odsyłacz do próśb w arkuszu Decisions
+      const note = (txt, key) => [txt || ''].concat((idx[key] || []).filter(m => m.ty === 'c').map(m => fdtEn(m.at) + ' – ' + evWho(m) + ': ' + (m.tx || '')),
+        tmap[p.id + '|' + key] ? ['Decision requests → Decisions sheet, ' + tmap[p.id + '|' + key]] : []).filter(Boolean).join('\n');
+      const c = d.c || {}, any = Object.keys(d.f || {}).some(k => d.f[k].n) || Object.keys(d.a || {}).some(k => d.a[k].n) || c.ok || c.miss || c.notes || c.done || Object.keys(idx).length;
       if (!any) return;
       const base = {pid: p.id, proc: pName(p), ev: p.ev || '', file: files(p)};
       const cm = [c.miss ? 'Missing data: ' + c.miss : '', c.notes ? 'Notes: ' + c.notes : ''].filter(Boolean).join('\n');
@@ -832,20 +839,21 @@ function workdayRows() {
         conv: '', fmt: '', det: '', note: cm, by: c.done ? (c.by || '') : (c.by || ''), dt: c.done ? 'Signed off ' + dt(c.done) : dt(c.ts), f: c.ok === 'N' ? 'Q' : c.ok === 'Y' ? 'Y' : '', proc_row: true}));
       groupBySec(p.fields).forEach(g => g.items.forEach(e => { const x = d.f[e.k] || {}, m = STD[x.n || ''], dd = dictOf(e);
         out.push(Object.assign({}, base, {kind: 'PL standard', sec: e.s, path: e.k, fld: e.f, desc: dd ? dd.d : '', sc: dd ? scope(dd.sc) : '', type: e.t ? tName(e.t) : '', ex: (e.v || []).join(' | '),
-          need: m[0], act: m[1], conv: x.n === 'Y' ? conv(x) : '', fmt: x.n === 'Y' ? fmt(x) : '', det: x.n === 'Y' ? det(x) : '', note: x.note || '', by: x.by || '', dt: dt(x.ts), f: m[2], t: x.n === 'Y' && x.t === 'Y'})); }));
-      groupBySec(p.adds).forEach(g => g.items.forEach(e => { const x = d.a['r:' + e.k]; if (!x || !x.n) return; const m = OPT[x.n], dd = dictOf(e);
+          need: m[0], act: m[1], conv: x.n === 'Y' ? conv(x) : '', fmt: x.n === 'Y' ? fmt(x) : '', det: x.n === 'Y' ? det(x) : '', note: note(x.note, e.k), by: x.by || '', dt: dt(x.ts), f: m[2], t: x.n === 'Y' && x.t === 'Y'})); }));
+      groupBySec(p.adds).forEach(g => g.items.forEach(e => { const x = d.a['r:' + e.k] || {}; if (!x.n && !withMsg('r:' + e.k)) return; const m = OPT[x.n || ''], dd = dictOf(e);
         out.push(Object.assign({}, base, {kind: 'Optional (xlsm sheet ' + p.id + ')', sec: e.s, path: e.k, fld: e.f, desc: dd ? dd.d : '', sc: dd ? scope(dd.sc) : '', type: e.t ? tName(e.t) : '', ex: (e.v || []).join(' | '),
-          need: m[0], act: m[1], conv: x.n === 'Y' ? conv(x) : '', fmt: x.n === 'Y' ? fmt(x) : '', det: x.n === 'Y' ? det(x) : '', note: x.why || '', by: x.by || '', dt: dt(x.ts), f: m[2], t: x.n === 'Y' && x.t === 'Y'})); }));
-      (p.dadd || []).forEach(i => { const x = d.a[dkey(i)]; if (!x || !x.n) return; const m = OPT[x.n], dd = D.dict[i];
+          need: m[0], act: m[1], conv: x.n === 'Y' ? conv(x) : '', fmt: x.n === 'Y' ? fmt(x) : '', det: x.n === 'Y' ? det(x) : '', note: note(x.why, 'r:' + e.k), by: x.by || '', dt: dt(x.ts), f: m[2], t: x.n === 'Y' && x.t === 'Y'})); }));
+      (p.dadd || []).forEach(i => { const x = d.a[dkey(i)] || {}; if (!x.n && !withMsg(dkey(i))) return; const m = OPT[x.n || ''], dd = D.dict[i];
         out.push(Object.assign({}, base, {kind: 'Optional (PECI Dictionary)', sec: dd.s, path: [dd.s, dd.u.replace(/ /g, '_'), dd.f.replace(/ /g, '_')].filter(Boolean).join('/'), fld: dd.f.replace(/ /g, '_'), desc: dd.d || '', sc: scope(dd.sc), type: '', ex: '',
-          need: m[0], act: m[1], conv: x.n === 'Y' ? conv(x) : '', fmt: x.n === 'Y' ? fmt(x) : '', det: x.n === 'Y' ? det(x) : '', note: x.why || '', by: x.by || '', dt: dt(x.ts), f: m[2], t: x.n === 'Y' && x.t === 'Y'})); });
+          need: m[0], act: m[1], conv: x.n === 'Y' ? conv(x) : '', fmt: x.n === 'Y' ? fmt(x) : '', det: x.n === 'Y' ? det(x) : '', note: note(x.why, dkey(i)), by: x.by || '', dt: dt(x.ts), f: m[2], t: x.n === 'Y' && x.t === 'Y'})); });
     });
     return out;
   } finally { LANG = L0; }
 }
 async function exportWorkday() {
   let X; try { X = await loadExcelJS(); } catch (e) { toast(T('Nie udało się wczytać modułu Excel. Sprawdź połączenie i spróbuj ponownie.')); return; }
-  const rows = workdayRows(), items = rows.filter(r => !r.proc_row);
+  const th = decisionThreads(), tmap = {}; th.forEach(t => { tmap[t.pid + '|' + t.key] = t.no; });
+  const rows = workdayRows(tmap), items = rows.filter(r => !r.proc_row);
   // kolumny w grupach: kto/proces → dana PECI → decyzja Xpertis → standard Xpertis → komentarze → dane referencyjne
   const G = [['Process', 'FF17232E', [['#', 5], ['No.', 6], ['Business process', 26]]],
     ['PECI data item', 'FF3A4855', [['Data origin', 17], ['PECI section', 18], ['PECI field', 32], ['XML path', 48]]],
@@ -903,14 +911,14 @@ async function exportWorkday() {
       if (ci === C['Response / resolution'] && !pr) fl = 'FFF7FAFE';
       if (fl) c.fill = fill(fl); }); });
   ws.autoFilter = {from: {row: HR, column: 1}, to: {row: HR + Math.max(rows.length, 1), column: NC}};
-  addDiscussionSheet(wb);
+  addDecisionSheet(wb, th);
   const buf = await wb.xlsx.writeBuffer();
   download(`PECI_data_analysis_report_${ymd()}.xlsx`, new Blob([buf], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
   toast(rows.length ? T('Pobrano PECI data analysis report ({n} pozycji).', {n: items.length}) : T('Pobrano PECI data analysis report – na razie bez pozycji.'));
 }
 
-/* ---------- raport Excel: arkusz Discussions (EN) – wątki przy danych, wpisy chronologicznie ---------- */
-function discussionThreads() {
+/* ---------- raport Excel: arkusz Decisions (EN) – prośby o decyzję przy danych i ich historia, chronologicznie ---------- */
+function decisionThreads() {
   const L0 = LANG; LANG = 'en';
   try {
     const out = [];
@@ -918,15 +926,16 @@ function discussionThreads() {
     const xml = e => e.k && !/^d:/.test(e.k) ? e.k : [e.s, e.u, e.f].filter(Boolean).join('/');
     PROCS.forEach(p => { const d = S.d[p.id]; if (!d || !d.m || !Object.keys(d.m).length) return; const idx = thrIndex(p);
       const order = p.fields.map(e => [e.k, 'PL standard', e, 'std']).concat(p.adds.map(e => ['r:' + e.k, 'Optional (xlsm sheet ' + p.id + ')', e, 'opt']), dictItems(p).map(e => [e.k, 'Optional (PECI Dictionary)', e, 'opt']));
-      const seen = new Set();
-      order.forEach(([key, origin, e, kind]) => { const ms = idx[key]; if (!ms || !ms.length) return; seen.add(key);
-        out.push({proc: p.id + ' · ' + pName(p), origin, field: e.f, path: xml(e), decision: decTxt(kind, kind === 'std' ? d.f[key] : d.a[key]), ms}); });
-      Object.keys(idx).filter(k => !seen.has(k)).forEach(k => out.push({proc: p.id + ' · ' + pName(p), origin: '–', field: k, path: k, decision: '–', ms: idx[k]})); });
+      const seen = new Set(), reqs = key => (idx[key] || []).filter(m => m.ty === 'q');
+      order.forEach(([key, origin, e, kind]) => { seen.add(key); const ms = reqs(key); if (!ms.length) return;
+        out.push({pid: p.id, key, proc: p.id + ' · ' + pName(p), origin, field: e.f, path: xml(e), decision: decTxt(kind, kind === 'std' ? d.f[key] : d.a[key]), ms}); });
+      Object.keys(idx).filter(k => !seen.has(k) && reqs(k).length).forEach(k => out.push({pid: p.id, key: k, proc: p.id + ' · ' + pName(p), origin: '–', field: k, path: k, decision: '–', ms: reqs(k)})); });
+    out.sort((a, b) => byAt(a.ms[0], b.ms[0]));
+    out.forEach((t, i) => { t.no = 'T' + (i + 1); });
     return out;
   } finally { LANG = L0; }
 }
-function addDiscussionSheet(wb) {
-  const th = discussionThreads();
+function addDecisionSheet(wb, th) {
   const G = [['Data item', 'FF17232E', [['#', 8], ['Process', 26], ['Data origin', 22], ['PECI field', 30], ['XML path', 44], ['Decision', 14]]],
     ['Entry (chronological)', 'FF3A4855', [['No.', 5], ['Date & time', 19], ['Author', 14], ['Author team', 13], ['Entry type', 16], ['For team', 13], ['Message', 64]]],
     ['Decision request', 'FF9A600C', [['Status', 11], ['Resolved by', 24], ['Resolved on', 19], ['Resolution', 44]]]];
@@ -934,12 +943,11 @@ function addDiscussionSheet(wb) {
   const A = {name: 'Arial', size: 10}, ink = 'FF17232E', grey = 'FF8D98A4', line = {style: 'thin', color: {argb: 'FFD9DFE5'}};
   const fill = argb => ({type: 'pattern', pattern: 'solid', fgColor: {argb}});
   const SF = {Waiting: 'FFFAEED7', Resolved: 'FFE1F2E8'}, SC = {Waiting: 'FF9A600C', Resolved: 'FF1B7446'};
-  const fdtEn = iso => iso ? new Date(iso).toLocaleString('en-GB', {day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'}) : '';
-  const ws = wb.addWorksheet('Discussions', {views: [{state: 'frozen', ySplit: HR, xSplit: 2, showGridLines: false, zoomScale: 90}],
+  const ws = wb.addWorksheet('Decisions', {views: [{state: 'frozen', ySplit: HR, xSplit: 2, showGridLines: false, zoomScale: 90}],
     pageSetup: {orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9, printTitlesRow: '4:5', margins: {left: .4, right: .4, top: .5, bottom: .5, header: .3, footer: .3}},
-    headerFooter: {oddFooter: '&LDiscussions – PECI data analysis report&RPage &P of &N'}});
+    headerFooter: {oddFooter: '&LDecisions – PECI data analysis report&RPage &P of &N'}});
   ws.columns = cols.map(c => ({width: c[1]}));
-  ws.getCell(1, 1).value = 'Discussions – comments and decision requests'; ws.getCell(1, 1).font = Object.assign({}, A, {size: 16, bold: true, color: {argb: ink}}); ws.getRow(1).height = 26;
+  ws.getCell(1, 1).value = 'Decisions – decision requests and their resolution'; ws.getCell(1, 1).font = Object.assign({}, A, {size: 16, bold: true, color: {argb: ink}}); ws.getRow(1).height = 26;
   ws.getCell(2, 1).value = `Workday → Xpertis integration (Poland) · Generated ${new Date().toLocaleString('en-GB', {dateStyle: 'medium', timeStyle: 'short'})} · Prepared by ${S.who || '–'} · Messages are in the author's language`;
   ws.getCell(2, 1).font = Object.assign({}, A, {color: {argb: 'FF66727F'}});
   const first = new Set(); let c0 = 1;
@@ -951,7 +959,7 @@ function addDiscussionSheet(wb) {
     c0 = c1 + 1; });
   ws.getRow(4).height = 20; ws.getRow(HR).height = 30;
   let r = HR + 1;
-  if (!th.length) { const c = ws.getCell(r, 1); c.value = 'No discussions yet.'; c.font = Object.assign({}, A, {italic: true}); r++; }
+  if (!th.length) { const c = ws.getCell(r, 1); c.value = 'No decision requests yet.'; c.font = Object.assign({}, A, {italic: true}); r++; }
   const EC = {Resolved: 'FF1B7446', Reopened: 'FF9A600C'};
   const style = (row, head, status, req, evt) => row.eachCell({includeEmpty: true}, (c, ci) => {
     const f = Object.assign({}, A);
@@ -968,13 +976,13 @@ function addDiscussionSheet(wb) {
     const reqs = t.ms.filter(m => m.ty === 'q'), open = reqs.filter(m => !m.done), teams = open.map(m => m.to).filter((x, i, a) => x && a.indexOf(x) === i);
     const status = open.length ? 'Waiting' : reqs.length ? 'Resolved' : '–';
     const tl = timeline(t.ms), nev = tl.length - t.ms.length, no = {};
-    const sum = [t.ms.length + (t.ms.length === 1 ? ' entry' : ' entries'), reqs.length ? reqs.length + (reqs.length === 1 ? ' decision request' : ' decision requests') : 'comments only',
+    const sum = [reqs.length + (reqs.length === 1 ? ' decision request' : ' decision requests'),
       reqs.length ? (open.length ? (reqs.length > open.length ? (reqs.length - open.length) + ' resolved, ' : '') + open.length + ' waiting for ' + teams.join(', ') : 'all resolved') : '',
       nev ? nev + (nev === 1 ? ' status change' : ' status changes') : ''].filter(Boolean).join(' · ');
     const hr = ws.getRow(r);
-    hr.values = ['T' + (ti + 1), t.proc, t.origin, t.field, t.path, t.decision, tl.length, sum, '', '', '', '', '', status, '', '', ''];
+    hr.values = [t.no, t.proc, t.origin, t.field, t.path, t.decision, tl.length, sum, '', '', '', '', '', status, '', '', ''];
     ws.mergeCells(r, 8, r, 13); style(hr, true, status, false); r++;
-    tl.forEach((m, i) => { const row = ws.getRow(r), n = i + 1, pre = ['T' + (ti + 1) + '.' + n, t.proc, t.origin, t.field, t.path, t.decision, n, fdtEn(m.at), m.nm || String(m.by || '').split(' · ')[0], m.tm || ''];
+    tl.forEach((m, i) => { const row = ws.getRow(r), n = i + 1, pre = [t.no + '.' + n, t.proc, t.origin, t.field, t.path, t.decision, n, fdtEn(m.at), m.nm || String(m.by || '').split(' · ')[0], m.tm || ''];
       if (m.ev) { const res = m.ev === 'res', et = res ? 'Resolved' : 'Reopened';
         row.values = pre.concat([et, m.req.to || '', 'Request no. ' + (no[m.req.id] || '?') + (res ? ' marked as resolved' : ' reopened'), '', '', '', res ? (m.rn || '') : '']);
         style(row, false, '', false, et); }
